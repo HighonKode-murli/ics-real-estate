@@ -228,7 +228,7 @@
     initSiteAnimations();
 
     function framePath(folder, index) {
-        return `${folder}/image-${String(index + 1).padStart(6, "0")}.jpg`;
+        return `${folder}/image-${String(index + 1).padStart(6, "0")}.webp`;
     }
 
     function createImageSequence(options) {
