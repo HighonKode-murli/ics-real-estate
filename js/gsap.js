@@ -61,6 +61,29 @@
     gsap.registerPlugin(ScrollTrigger);
 
     const isMobile = window.matchMedia("(max-width: 991px)").matches;
+    let viewportSyncTimer = null;
+
+    function syncMobileViewportHeight(refreshTriggers) {
+        if (window.innerWidth > 767) {
+            document.documentElement.style.removeProperty("--mobile-viewport-height");
+            return;
+        }
+
+        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        document.documentElement.style.setProperty("--mobile-viewport-height", `${Math.round(viewportHeight)}px`);
+        if (refreshTriggers) ScrollTrigger.refresh();
+    }
+
+    syncMobileViewportHeight(false);
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", function () {
+            window.clearTimeout(viewportSyncTimer);
+            viewportSyncTimer = window.setTimeout(function () {
+                syncMobileViewportHeight(true);
+            }, 180);
+        }, { passive: true });
+    }
 
     function initSiteAnimations() {
         gsap.utils.toArray(".editorial-index").forEach(function (indexRow) {
@@ -335,6 +358,7 @@
             const nextWidth = window.innerWidth;
             if (Math.abs(nextWidth - lastViewportWidth) < 2) return;
             lastViewportWidth = nextWidth;
+            syncMobileViewportHeight(false);
             window.clearTimeout(resizeTimer);
             resizeTimer = window.setTimeout(function () {
                 resize();

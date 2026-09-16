@@ -3513,10 +3513,21 @@ body.menu-is-open {
 .menu-toggle:focus-visible,
 .menu-link:focus-visible,
 .social-icon-link:focus-visible,
-.back-top-icon:focus-visible,
-.custom-form .form-control:focus-visible {
+.back-top-icon:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 4px;
+}
+
+.custom-form .form-control:focus,
+.custom-form .form-control:focus-visible {
+  outline: none;
+  outline-offset: 0;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 2px solid var(--gold);
+  border-left: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .menu-is-open .menu-panel {
@@ -3610,4 +3621,269 @@ body.menu-is-open {
     height: 44px;
     line-height: 44px;
   }
+}
+
+
+/* ============================================================
+   MOBILE SCREENSHOT FIXES
+   ============================================================ */
+/* ScrollTrigger's spacer must never expose the light page behind a pinned film. */
+.pin-spacer {
+  background: var(--ink);
+}
+
+.footer-bottom-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: clamp(24px, 5vw, 64px);
+  width: 100%;
+  padding-top: 32px;
+}
+
+.footer-bottom-row .copyright-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.footer-bottom-row .back-top-icon {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+@media screen and (max-width: 767px) {
+  .sequence-stage,
+  .hero-section,
+  .property-journey {
+    height: var(--mobile-viewport-height, 100dvh);
+    min-height: var(--mobile-viewport-height, 100dvh);
+  }
+
+  .hero-content {
+    bottom: max(68px, calc(env(safe-area-inset-bottom) + 58px));
+  }
+
+  .hero-content h1 {
+    font-size: clamp(50px, 16vw, 76px);
+    line-height: 0.8;
+  }
+
+  #hero-h1-2 {
+    margin-top: 0.1em;
+    margin-left: 16%;
+  }
+
+  .sequence-scroll-cue {
+    display: none !important;
+  }
+
+  .footer-bottom-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 20px;
+    align-items: end;
+    padding-top: 28px;
+  }
+
+  .footer-bottom-row .copyright-text {
+    padding: 0;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+
+  .footer-bottom-row .back-top-icon {
+    align-self: end;
+    justify-self: end;
+  }
+}
+
+@media screen and (max-width: 359px) {
+  .hero-content {
+    bottom: max(62px, calc(env(safe-area-inset-bottom) + 52px));
+  }
+
+  .hero-content h1 {
+    font-size: clamp(48px, 15.5vw, 54px);
+  }
+
+  .footer-bottom-row {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-bottom-row .back-top-icon {
+    margin-top: 4px;
+  }
+}
+
+
+/* Keep the back-to-top glyph inside its dedicated footer track. */
+.footer-bottom-row .back-top-icon {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: 0;
+  line-height: 1;
+}
+
+.footer-bottom-row .back-top-icon i {
+  display: block;
+  width: 40px;
+  height: 40px;
+  font-size: 38px;
+  line-height: 40px;
+}
+
+.footer-bottom-row .back-top-icon i::before {
+  display: block;
+  line-height: 40px;
+}
+
+
+/* ============================================================
+   ENQUIRY FORM REFINEMENT
+   ============================================================ */
+/* Fields use a single underline as their focus signal—never a box outline. */
+#bb-booking-form .form-control:focus,
+#bb-booking-form .form-control:focus-visible,
+#bb-booking-form .form-select:focus,
+#bb-booking-form .form-select:focus-visible {
+  outline: 0 !important;
+  outline-offset: 0 !important;
+  border-top: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 2px solid var(--gold) !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
+@media screen and (min-width: 768px) {
+  #booking-div > .row > .col-lg-10 {
+    width: 100%;
+    max-width: 1120px;
+    margin-right: auto;
+    margin-left: auto;
+  }
+
+  #bb-booking-form {
+    width: 100%;
+    max-width: 1040px;
+    margin-right: auto;
+    margin-left: auto;
+  }
+
+  #bb-booking-form .booking-form-body {
+    max-width: 920px;
+    margin-right: auto;
+    margin-left: auto;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  #bb-booking-form,
+  #bb-booking-form .booking-form-body {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+
+/* Final enquiry field treatment: never draw a rectangular focus box. */
+#bb-booking-form input.form-control,
+#bb-booking-form select.form-control,
+#bb-booking-form textarea.form-control {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  outline: none !important;
+  outline-offset: 0 !important;
+  border-top: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.32) !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#bb-booking-form .col-lg-6:focus-within .form-control,
+#bb-booking-form .booking-form-body > .form-label:has(+ .form-control) + .form-control,
+#bb-booking-form input.form-control:focus,
+#bb-booking-form input.form-control:focus-visible,
+#bb-booking-form select.form-control:focus,
+#bb-booking-form select.form-control:focus-visible,
+#bb-booking-form textarea.form-control:focus,
+#bb-booking-form textarea.form-control:focus-visible {
+  outline: none !important;
+  border-bottom: 2px solid var(--gold) !important;
+  box-shadow: none !important;
+}
+
+@media screen and (min-width: 768px) {
+  #booking-div > .row > .col-lg-10 {
+    max-width: 940px;
+  }
+
+  #bb-booking-form {
+    max-width: 880px;
+  }
+
+  #bb-booking-form .booking-form-body {
+    max-width: 780px;
+  }
+}
+
+
+/* Enquiry fields: the rule is an underline, never a rectangular border. */
+#bb-booking-form input.form-control,
+#bb-booking-form select.form-control,
+#bb-booking-form textarea.form-control,
+#bb-booking-form input.form-control:focus,
+#bb-booking-form input.form-control:focus-visible,
+#bb-booking-form select.form-control:focus,
+#bb-booking-form select.form-control:focus-visible,
+#bb-booking-form textarea.form-control:focus,
+#bb-booking-form textarea.form-control:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-repeat: no-repeat !important;
+  background-position: left bottom !important;
+  background-size: 100% 1px !important;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.32)) !important;
+}
+
+#bb-booking-form input.form-control:focus,
+#bb-booking-form input.form-control:focus-visible,
+#bb-booking-form select.form-control:focus,
+#bb-booking-form select.form-control:focus-visible,
+#bb-booking-form textarea.form-control:focus,
+#bb-booking-form textarea.form-control:focus-visible {
+  background-size: 100% 2px !important;
+  background-image: linear-gradient(var(--gold), var(--gold)) !important;
+}
+
+@media screen and (min-width: 992px) {
+  #bb-booking-form .booking-form-body > .row {
+    --bs-gutter-x: 28px;
+  }
+
+  #bb-booking-form .booking-form-body > .row > .col-lg-6 {
+    width: 50% !important;
+    max-width: 50% !important;
+  }
+}
+
+
+/* Compact enquiry submit action. */
+#bb-booking-form .booking-submit {
+  width: min(100%, 240px);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+#bb-booking-form .booking-submit button {
+  width: 100%;
 }
