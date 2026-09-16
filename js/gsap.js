@@ -384,16 +384,20 @@
         };
     }
 
-    function animateChapter(timeline, element, enter, leave) {
+    function animateChapter(timeline, element, enter, leave, transition) {
         const chapterOffset = isMobile ? 24 : 42;
         const chapterBlur = isMobile ? 4 : 9;
+        const enterDuration = transition && transition.enterDuration ? transition.enterDuration : 0.05;
+        const leaveDuration = transition && transition.leaveDuration ? transition.leaveDuration : 0.04;
+        const enterEase = transition && transition.enterEase ? transition.enterEase : "power2.out";
+        const leaveEase = transition && transition.leaveEase ? transition.leaveEase : "power2.in";
         timeline.fromTo(element,
             { autoAlpha: 0, y: chapterOffset, filter: `blur(${chapterBlur}px)` },
-            { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.05, ease: "power2.out" },
+            { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: enterDuration, ease: enterEase },
             enter
         );
         timeline.to(element,
-            { autoAlpha: 0, y: isMobile ? -16 : -28, filter: `blur(${isMobile ? 3 : 7}px)`, duration: 0.04, ease: "power2.in" },
+            { autoAlpha: 0, y: isMobile ? -16 : -28, filter: `blur(${isMobile ? 3 : 7}px)`, duration: leaveDuration, ease: leaveEase },
             leave
         );
     }
@@ -401,6 +405,11 @@
     function buildSequenceTimeline(sequence, options) {
         if (!sequence) return null;
         const chapters = gsap.utils.toArray(options.chapterSelector);
+        const endGlide = typeof options.endGlide === "number" ? Math.max(0, options.endGlide) : 0.15;
+        const settleStart = 0.94;
+        const settleFrame = Math.round((sequence.frameCount - 1) * settleStart);
+        const totalDuration = 1 + endGlide;
+        const scrollDistanceScale = totalDuration;
 
         gsap.set(chapters, { autoAlpha: 0 });
         const timeline = gsap.timeline({
@@ -408,9 +417,12 @@
                 trigger: options.trigger,
                 start: "top top",
                 end: function () {
-                    if (window.innerWidth >= 992) return `+=${options.desktopDistance}`;
+                    if (window.innerWidth >= 992) {
+                        return `+=${Math.round(options.desktopDistance * scrollDistanceScale)}`;
+                    }
                     const responsiveDistance = Math.round(Math.max(2400, window.innerHeight * 3.6));
-                    return `+=${Math.min(options.mobileDistance, responsiveDistance)}`;
+                    const mobilePlaybackDistance = Math.min(options.mobileDistance, responsiveDistance);
+                    return `+=${Math.round(mobilePlaybackDistance * scrollDistanceScale)}`;
                 },
                 scrub: 0.55,
                 pin: true,
@@ -423,21 +435,30 @@
             }
         });
 
-        timeline.to(sequence.state, {
-            frame: sequence.frameCount - 1,
-            duration: 1,
-            ease: "none",
-            onUpdate: function () {
-                sequence.requestAround(sequence.state.frame);
-                sequence.render(false);
-            }
-        }, 0);
+        function renderSequenceFrame() {
+            sequence.requestAround(sequence.state.frame);
+            sequence.render(false);
+        }
+
+        timeline
+            .to(sequence.state, {
+                frame: settleFrame,
+                duration: settleStart,
+                ease: "none",
+                onUpdate: renderSequenceFrame
+            }, 0)
+            .to(sequence.state, {
+                frame: sequence.frameCount - 1,
+                duration: totalDuration - settleStart,
+                ease: "power2.out",
+                onUpdate: renderSequenceFrame
+            }, settleStart);
 
         const progressBar = sequence.stage.querySelector(".sequence-progress span");
-        if (progressBar) timeline.to(progressBar, { scaleX: 1, duration: 1, ease: "none" }, 0);
+        if (progressBar) timeline.to(progressBar, { scaleX: 1, duration: totalDuration, ease: "none" }, 0);
 
         options.chapterWindows.forEach(function (range, index) {
-            if (chapters[index]) animateChapter(timeline, chapters[index], range[0], range[1]);
+            if (chapters[index]) animateChapter(timeline, chapters[index], range[0], range[1], options.chapterTransition);
         });
 
         if (options.heroIntroMotion) {
@@ -514,7 +535,14 @@
         buildSequenceTimeline(propertySequence, {
             trigger: "#property-journey",
             chapterSelector: "[data-property-chapter]",
-            chapterWindows: [[0.03, 0.18], [0.27, 0.43], [0.52, 0.69], [0.78, 0.96]],
+            // Caption 03 follows the townhouse reveal (~image 363); caption 04 follows the city reveal (~image 508).
+            chapterWindows: [[0.03, 0.18], [0.27, 0.43], [0.608, 0.792], [0.852, 0.94]],
+            chapterTransition: {
+                enterDuration: 0.07,
+                leaveDuration: 0.06,
+                enterEase: "power2.out",
+                leaveEase: "power2.inOut"
+            },
             desktopDistance: 5600,
             mobileDistance: 4000,
             posterFrame: 200

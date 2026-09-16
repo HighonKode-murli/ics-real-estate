@@ -3887,3 +3887,18 @@ body.menu-is-open {
 #bb-booking-form .booking-submit button {
   width: 100%;
 }
+
+/* Preserve the first sequence's desktop left/right caption composition on mobile. */
+@media screen and (max-width: 767px) {
+  #section_1 [data-dubai-chapter].sequence-chapter--right {
+    right: var(--page-gutter);
+    left: auto;
+    text-align: right;
+  }
+
+  #section_1 [data-dubai-chapter].sequence-chapter--right .sequence-chapter__detail {
+    max-width: min(48vw, 190px);
+    margin-left: auto;
+    text-wrap: balance;
+  }
+}
