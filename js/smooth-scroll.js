@@ -12,9 +12,7 @@
         lockReasons.add("loader");
     }
 
-    const primaryTouchDevice = navigator.maxTouchPoints > 0
-        && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-    const lenis = !primaryTouchDevice && typeof window.Lenis === "function"
+    const lenis = typeof window.Lenis === "function"
         ? new window.Lenis({
             autoRaf: false,
             smoothWheel: true,
