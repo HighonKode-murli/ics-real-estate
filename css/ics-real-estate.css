@@ -559,6 +559,20 @@ body.is-loading {
   opacity: 1;
 }
 
+.sequence-frame-canvas {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.sequence-stage.is-image-ready .sequence-frame-canvas {
+  opacity: 1;
+}
+
 .sequence-shade {
   position: absolute;
   z-index: 1;

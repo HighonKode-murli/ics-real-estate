@@ -11,7 +11,8 @@ const publicEntries = [
   "js",
   "fonts",
   "images",
-  "frames"
+  "frames",
+  "seq 2 (webp)"
 ];
 
 async function assertEntryExists(entry) {

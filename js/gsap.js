@@ -36,8 +36,8 @@
 
         if (window.gsap) {
             gsap.fromTo(".hero-intro-layer",
-                { autoAlpha: 0, y: 32 },
-                { autoAlpha: 1, y: 0, duration: 1.1, delay: 0.18, stagger: 0.09, ease: "power3.out" }
+                { autoAlpha: 0, y: 40 },
+                { autoAlpha: 1, y: 0, duration: 1.4, delay: 0.3, stagger: 0.09, ease: "power3.out" }
             );
         }
     }
@@ -105,27 +105,27 @@
         });
 
         gsap.from(".about-intro h2", {
-            y: isMobile ? 48 : 120,
+            y: isMobile ? 48 : 100,
             autoAlpha: 0,
-            duration: 1.25,
             ease: "power4.out",
             scrollTrigger: {
                 trigger: ".about-intro",
-                start: "top 82%",
-                toggleActions: "play none none reverse"
+                start: "top 90%",
+                toggleActions: "play none none reverse",
+                scrub : 2
             }
         });
 
         gsap.from(".about-copy, .about-link", {
             y: isMobile ? 28 : 55,
             autoAlpha: 0,
-            duration: 1,
             stagger: 0.12,
             ease: "power3.out",
             scrollTrigger: {
                 trigger: ".about-intro",
-                start: "top 68%",
-                toggleActions: "play none none reverse"
+                start: "top 45%",
+                toggleActions: "play none none reverse",
+                scrub : 2
             }
         });
 
@@ -311,9 +311,178 @@
         return sequence;
     }
 
+    function createImageFrameSequence(options) {
+        const stage = document.querySelector(options.trigger);
+        const canvas = document.getElementById(options.canvasId);
+        if (!stage || !canvas) return null;
+
+        const context = canvas.getContext("2d", { alpha: false });
+        if (!context) return null;
+
+        const loadedFrames = new Array(options.frameCount);
+        const frameRequests = new Array(options.frameCount);
+        let currentProgress = 0;
+        let lastRenderedFrame = -1;
+        let preloadCursor = 1;
+        let preloadTimer = null;
+        let active = false;
+        let cssWidth = 1;
+        let cssHeight = 1;
+        let resizeTimer = null;
+        let readinessSettled = false;
+        let resolveReadiness;
+
+        const ready = new Promise(function (resolve) {
+            resolveReadiness = resolve;
+        });
+
+        function frameSource(index) {
+            const filename = `image-${String(index + 1).padStart(6, "0")}.webp`;
+            return `${options.folder}/${filename}`;
+        }
+
+        function targetFrame() {
+            return Math.max(0, Math.min(
+                options.frameCount - 1,
+                Math.round(currentProgress * (options.frameCount - 1))
+            ));
+        }
+
+        function nearestLoadedFrame(frame) {
+            if (loadedFrames[frame]) return frame;
+            for (let offset = 1; offset < options.frameCount; offset += 1) {
+                if (frame - offset >= 0 && loadedFrames[frame - offset]) return frame - offset;
+                if (frame + offset < options.frameCount && loadedFrames[frame + offset]) return frame + offset;
+            }
+            return -1;
+        }
+
+        function drawCover(image) {
+            const scale = Math.max(cssWidth / image.naturalWidth, cssHeight / image.naturalHeight);
+            const width = image.naturalWidth * scale;
+            const height = image.naturalHeight * scale;
+            context.clearRect(0, 0, cssWidth, cssHeight);
+            context.drawImage(image, (cssWidth - width) / 2, (cssHeight - height) / 2, width, height);
+        }
+
+        function render(force) {
+            const drawableFrame = nearestLoadedFrame(targetFrame());
+            if (drawableFrame < 0 || (!force && drawableFrame === lastRenderedFrame)) return;
+            drawCover(loadedFrames[drawableFrame]);
+            lastRenderedFrame = drawableFrame;
+        }
+
+        function resize() {
+            const bounds = stage.getBoundingClientRect();
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            cssWidth = Math.max(1, Math.round(bounds.width));
+            cssHeight = Math.max(1, Math.round(bounds.height));
+            canvas.width = Math.round(cssWidth * dpr);
+            canvas.height = Math.round(cssHeight * dpr);
+            context.setTransform(dpr, 0, 0, dpr, 0, 0);
+            lastRenderedFrame = -1;
+            render(true);
+        }
+
+        function markReady(success) {
+            if (readinessSettled) return;
+            readinessSettled = true;
+            stage.classList.add(success ? "is-image-ready" : "is-image-error");
+            resolveReadiness(success);
+        }
+
+        function requestFrame(index) {
+            if (index < 0 || index >= options.frameCount) return Promise.resolve(false);
+            if (loadedFrames[index]) return Promise.resolve(true);
+            if (frameRequests[index]) return frameRequests[index];
+
+            frameRequests[index] = new Promise(function (resolve) {
+                const image = new Image();
+                image.decoding = "async";
+                image.onload = function () {
+                    loadedFrames[index] = image;
+                    if (index === 0) markReady(true);
+                    if (Math.abs(index - targetFrame()) <= 2 || lastRenderedFrame < 0) render(false);
+                    resolve(true);
+                };
+                image.onerror = function () {
+                    frameRequests[index] = null;
+                    if (index === 0) markReady(false);
+                    resolve(false);
+                };
+                image.src = frameSource(index);
+            });
+
+            return frameRequests[index];
+        }
+
+        function requestAroundProgress() {
+            const center = targetFrame();
+            requestFrame(center);
+            for (let offset = 1; offset <= 16; offset += 1) {
+                requestFrame(center + offset);
+                requestFrame(center - offset);
+            }
+        }
+
+        function preloadBatch() {
+            if (!active) return;
+            let count = 0;
+            while (preloadCursor < options.frameCount && count < 8) {
+                requestFrame(preloadCursor);
+                preloadCursor += 1;
+                count += 1;
+            }
+            if (preloadCursor < options.frameCount) {
+                preloadTimer = window.setTimeout(preloadBatch, 70);
+            }
+        }
+
+        const state = {};
+        Object.defineProperty(state, "progress", {
+            enumerable: true,
+            get: function () {
+                return currentProgress;
+            },
+            set: function (value) {
+                currentProgress = Math.max(0, Math.min(1, value));
+                requestAroundProgress();
+                render(false);
+            }
+        });
+
+        window.addEventListener("resize", function () {
+            window.clearTimeout(resizeTimer);
+            resizeTimer = window.setTimeout(function () {
+                resize();
+            }, 160);
+        }, { passive: true });
+
+        resize();
+        requestFrame(0);
+
+        return {
+            stage: stage,
+            state: state,
+            ready: ready,
+            activate: function () {
+                if (active) return;
+                active = true;
+                requestAroundProgress();
+                requestFrame(options.frameCount - 1);
+                preloadBatch();
+            },
+            destroy: function () {
+                window.clearTimeout(preloadTimer);
+                window.clearTimeout(resizeTimer);
+            }
+        };
+    }
+
     function buildSequenceTimeline(sequence, options) {
         if (!sequence) return null;
         const chapters = gsap.utils.toArray(options.chapterSelector);
+        const hasChapters = chapters.length > 0;
         const endGlide = typeof options.endGlide === "number" ? Math.max(0, options.endGlide) : 0.15;
         const settleStart = 0.94;
         const totalDuration = 1 + endGlide;
@@ -325,6 +494,7 @@
                 trigger: options.trigger,
                 start: "top top",
                 end: function () {
+                    if (!hasChapters) return `+=${Math.round(Math.max(1, window.innerHeight * 0.85))}`;
                     if (window.innerWidth >= 992) {
                         return `+=${Math.round(options.desktopDistance * scrollDistanceScale)}`;
                     }
@@ -332,7 +502,7 @@
                     const mobilePlaybackDistance = Math.min(options.mobileDistance, responsiveDistance);
                     return `+=${Math.round(mobilePlaybackDistance * scrollDistanceScale)}`;
                 },
-                scrub: 0.55,
+                scrub: 0.6,
                 pin: true,
                 pinSpacing: true,
                 anticipatePin: 1,
@@ -347,20 +517,22 @@
             }
         });
 
-        timeline
-            .to(sequence.state, {
-                progress: settleStart,
-                duration: settleStart,
-                ease: "none"
-            }, 0)
-            .to(sequence.state, {
-                progress: 1,
-                duration: totalDuration - settleStart,
-                ease: "power2.out"
-            }, settleStart);
+        if (hasChapters) {
+            timeline
+                .to(sequence.state, {
+                    progress: settleStart,
+                    duration: settleStart,
+                    ease: "none"
+                }, 0)
+                .to(sequence.state, {
+                    progress: 1,
+                    duration: totalDuration - settleStart,
+                    ease: "power2.out"
+                }, settleStart);
+        }
 
         const progressBar = sequence.stage.querySelector(".sequence-progress span");
-        if (progressBar) {
+        if (progressBar && hasChapters) {
             const progressAxis = progressBar.parentElement.dataset.progressAxis === "y" ? "scaleY" : "scaleX";
             const progressAnimation = { duration: totalDuration, ease: "none" };
             progressAnimation[progressAxis] = 1;
@@ -394,33 +566,58 @@
             timeline
                 .to(stage.querySelectorAll(".hero-categories span"), {
                     y: isMobile ? -180 : -300,
-                    duration: 0.14,
-                    ease: "power2.in"
+                    duration: 2,
+                    ease: "power2.in",
+                    scrollTrigger:{
+                        trigger : "#hero-div",
+                        scrub : 2,
+                        start : "top 100%"
+                    }
                 }, 0.025)
                 .to(stage.querySelector(".hero-intro p"), {
                     y: isMobile ? -180 : -300,
-                    duration: 0.14,
-                    ease: "power2.in"
+                    duration: 2,
+                    ease: "power2.in",
+                    scrollTrigger:{
+                        trigger : "#hero-div",
+                        scrub : 2,
+                        start : "top 100%"
+                    }
                 }, 0.025)
                 .to(stage.querySelector("#hero-h1-1"), {
                     x: function () {
-                        return isMobile ? -window.innerWidth * 1.15 : -Math.max(800, window.innerWidth * 0.85);
+                        return isMobile ? -window.innerWidth * 2 : -Math.max(800, window.innerWidth * 0.85);
                     },
-                    duration: 0.15,
-                    ease: "power2.in"
+                    duration: 2,
+                    ease: "power2.in",
+                    scrollTrigger:{
+                        trigger : "#hero-div",
+                        scrub : 2,
+                        start : "top 100%"
+                    }
                 }, 0.035)
                 .to(stage.querySelector("#hero-h1-2"), {
                     x: function () {
-                        return isMobile ? window.innerWidth * 1.15 : Math.max(800, window.innerWidth * 0.85);
+                        return isMobile ? window.innerWidth * 2 : Math.max(800, window.innerWidth * 0.85);
                     },
-                    duration: 0.15,
-                    ease: "power2.in"
+                    duration: 2,
+                    ease: "power2.in",
+                    scrollTrigger:{
+                        trigger : "#hero-div",
+                        scrub : 2,
+                        start : "top 100%"
+                    }
                 }, 0.035)
                 .to(stage.querySelector(".sequence-scroll-cue"), {
                     autoAlpha: 0,
                     y: -45,
-                    duration: 0.08,
-                    ease: "power2.in"
+                    duration: 2,
+                    ease: "power2.in",
+                    scrollTrigger:{
+                        trigger : "#hero-div",
+                        scrub : 2,
+                        start : "top 100%",
+                    }
                 }, 0.025);
         }
 
@@ -432,8 +629,11 @@
             trigger: "#section_1"
         });
 
-        const propertySequence = createStaticSequence({
-            trigger: "#property-journey"
+        const propertySequence = createImageFrameSequence({
+            trigger: "#property-journey",
+            canvasId: "property-sequence-canvas",
+            folder: "seq 2 (webp)",
+            frameCount: 596
         });
 
         if (dubaiSequence) {
@@ -445,7 +645,8 @@
                     heroIntroMotion: true,
                     chapterWindows: [[0.20, 0.34], [0.43, 0.59], [0.69, 0.88]],
                     desktopDistance: 5200,
-                    mobileDistance: 3800
+                    mobileDistance: 3800,
+                    
                 });
                 setLoaderProgress(0.96);
                 window.clearTimeout(loaderFailSafe);
@@ -474,10 +675,14 @@
                         enterEase: "power2.out",
                         leaveEase: "power2.inOut"
                     },
-                    syncImagesToChapters: true,
-                    imageTransitionDuration: 0.06,
                     desktopDistance: 5600,
                     mobileDistance: 4000
+                });
+                ScrollTrigger.create({
+                    trigger: "#property-journey",
+                    start: "top 180%",
+                    once: true,
+                    onEnter: propertySequence.activate
                 });
                 ScrollTrigger.refresh();
             }).catch(function (error) {
