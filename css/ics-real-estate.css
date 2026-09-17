@@ -541,13 +541,9 @@ body.is-loading {
   min-height: 665px;
   overflow: hidden;
   color: var(--white-color);
-  /* Painted before the first video frame decodes, so the stage never flashes as
-     an empty panel while the clip is still downloading. */
-  background-color: #05080d;
-  background-image: radial-gradient(circle at 50% 38%, #16243a 0%, #05080d 72%);
 }
 
-.sequence-video {
+.sequence-image {
   position: absolute;
   z-index: 0;
   inset: 0;
@@ -557,10 +553,9 @@ body.is-loading {
   object-fit: cover;
   object-position: center;
   opacity: 0;
-  transition: opacity 0.7s ease;
 }
 
-.sequence-stage.is-video-ready .sequence-video {
+.sequence-stage.is-image-ready .sequence-image:first-child {
   opacity: 1;
 }
 
@@ -591,8 +586,8 @@ body.is-loading {
   transition: opacity 0.5s ease, visibility 0.5s ease;
 }
 
-.sequence-stage.is-video-ready .sequence-loader,
-.sequence-stage.is-video-error .sequence-loader {
+.sequence-stage.is-image-ready .sequence-loader,
+.sequence-stage.is-image-error .sequence-loader {
   visibility: hidden;
   opacity: 0;
 }

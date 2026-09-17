@@ -14,26 +14,6 @@
         if (loaderProgress) loaderProgress.style.transform = `scaleX(${progress})`;
     }
 
-    // Without this the bar holds at zero for the whole hero download and the site
-    // reads as hung. Buffered ranges give a truthful figure for almost no cost.
-    function reportLoaderBuffering(video) {
-        if (!video) return;
-
-        function update() {
-            if (loaderFinished || !video.buffered || video.buffered.length === 0) return;
-            const duration = video.duration;
-            if (!Number.isFinite(duration) || duration <= 0) return;
-
-            const buffered = video.buffered.end(video.buffered.length - 1);
-            setLoaderProgress(0.08 + 0.85 * Math.min(1, buffered / duration));
-        }
-
-        video.addEventListener("progress", update);
-        video.addEventListener("loadedmetadata", function () {
-            setLoaderProgress(0.08);
-        }, { once: true });
-    }
-
     function revealSite() {
         if (loaderFinished) return;
         loaderFinished = true;
@@ -74,7 +54,7 @@
     }
 
     // The loader must never trap the visitor, even when an asset or CDN is unavailable.
-    const loaderFailSafe = window.setTimeout(finishLoader, 8000);
+    const loaderFailSafe = window.setTimeout(finishLoader, 12000);
 
     if (typeof window.gsap === "undefined" || typeof window.ScrollTrigger === "undefined") {
         console.error("ICS animations: GSAP or ScrollTrigger did not load.");
@@ -247,7 +227,7 @@
         });
     }
 
-    // Register ordinary page animations before scroll-video setup so a media
+    // Register ordinary page animations before static sequence setup so a media
     // failure can never disable the rest of the site.
     initSiteAnimations();
 
@@ -269,107 +249,66 @@
         );
     }
 
-    function createVideoSequence(options) {
-        const video = document.getElementById(options.videoId);
+    function createStaticSequence(options) {
         const stage = document.querySelector(options.trigger);
-        if (!video || !stage) return null;
+        if (!stage) return null;
 
-        const state = { progress: 0 };
-        let isReady = false;
-        let lastTargetTime = -1;
-        let loadStarted = video.preload !== "none";
-        let readinessWatchdog = 0;
-        let resolveReadiness;
+        const sourceImages = Array.from(stage.querySelectorAll(".sequence-image"));
+        if (!sourceImages.length) return null;
 
-        const ready = new Promise(function (resolve) {
-            resolveReadiness = resolve;
+        const sequence = {
+            stage: stage,
+            state: { progress: 0 },
+            images: sourceImages,
+            ready: null
+        };
+
+        function waitForImage(image) {
+            if (image.complete) return Promise.resolve(image.naturalWidth > 0);
+
+            return new Promise(function (resolve) {
+                let settled = false;
+                const timeout = window.setTimeout(function () {
+                    finish(false);
+                }, 6000);
+
+                function finish(success) {
+                    if (settled) return;
+                    settled = true;
+                    window.clearTimeout(timeout);
+                    image.removeEventListener("load", handleLoad);
+                    image.removeEventListener("error", handleError);
+                    resolve(success);
+                }
+
+                function handleLoad() { finish(true); }
+                function handleError() { finish(false); }
+
+                image.addEventListener("load", handleLoad, { once: true });
+                image.addEventListener("error", handleError, { once: true });
+            });
+        }
+
+        sequence.ready = Promise.all(sourceImages.map(waitForImage)).then(function (results) {
+            sourceImages.forEach(function (image) {
+                gsap.set(image, { autoAlpha: 0 });
+            });
+
+            const firstAvailable = sourceImages[results.findIndex(Boolean)] || null;
+            let lastAvailable = firstAvailable;
+            sequence.images = results.map(function (success, index) {
+                if (success) lastAvailable = sourceImages[index];
+                return lastAvailable;
+            });
+
+            if (firstAvailable) gsap.set(firstAvailable, { autoAlpha: 1 });
+
+            const success = results.every(Boolean);
+            stage.classList.add(success ? "is-image-ready" : "is-image-error");
+            return success;
         });
 
-        // Direct currentTime assignment on every scrub update. Attempts to
-        // throttle this against video.seeking deadlock the scrub, so the seek
-        // load is kept down by shipping a smaller rendition instead (see the
-        // <source> list in index.html) rather than by dropping updates here.
-        function render(force) {
-            if (!isReady || !Number.isFinite(video.duration) || video.duration <= 0) return;
-
-            const progress = Math.max(0, Math.min(1, state.progress));
-            const targetTime = progress === 1
-                ? Math.max(0, video.duration - (1 / 240))
-                : progress * video.duration;
-
-            if (!force && Math.abs(targetTime - lastTargetTime) < (1 / 240)) return;
-            lastTargetTime = targetTime;
-            video.currentTime = targetTime;
-        }
-
-        function requestLoad() {
-            if (loadStarted) return;
-            loadStarted = true;
-            if (video.preload === "none") video.preload = "auto";
-            video.load();
-            startReadinessWatchdog();
-        }
-
-        function markReady() {
-            if (isReady) return;
-            isReady = true;
-            window.clearTimeout(readinessWatchdog);
-            stage.classList.remove("is-video-error");
-            stage.classList.add("is-video-ready");
-            video.pause();
-            render(true);
-            resolveReadiness(true);
-        }
-
-        function markUnavailable() {
-            if (isReady) return;
-            // Show the stage backdrop instead of leaving a spinner running
-            // forever. This is not final: a slow video that arrives later still
-            // calls markReady and takes over.
-            stage.classList.add("is-video-error");
-            resolveReadiness(false);
-        }
-
-        function startReadinessWatchdog() {
-            window.clearTimeout(readinessWatchdog);
-            readinessWatchdog = window.setTimeout(markUnavailable, 15000);
-        }
-
-        video.muted = true;
-        video.defaultMuted = true;
-        video.pause();
-
-        // Not { once: true }: if the watchdog gave up first, a late success must
-        // still be able to promote the stage to ready.
-        video.addEventListener("loadeddata", markReady);
-        // With <source> children the failure event is dispatched at the child,
-        // not at the video, so this listener has to capture. A single source
-        // failing is normal (the browser tries the next one); only an exhausted
-        // candidate list, NETWORK_NO_SOURCE, is terminal.
-        video.addEventListener("error", function () {
-            if (video.networkState === 3) markUnavailable();
-        }, true);
-
-        if (video.readyState >= 2 && Number.isFinite(video.duration)) {
-            markReady();
-        } else if (loadStarted) {
-            if (video.networkState === 0) video.load();
-            startReadinessWatchdog();
-        }
-
-        return {
-            stage: stage,
-            state: state,
-            ready: ready,
-            render: render,
-            video: video,
-            requestLoad: requestLoad,
-            activate: function () {
-                requestLoad();
-                video.pause();
-                render(true);
-            }
-        };
+        return sequence;
     }
 
     function buildSequenceTimeline(sequence, options) {
@@ -399,8 +338,6 @@
                 anticipatePin: 1,
                 invalidateOnRefresh: true,
                 refreshPriority: options.trigger === "#section_1" ? 20 : 10,
-                onEnter: sequence.activate,
-                onEnterBack: sequence.activate,
                 onLeave: function (self) {
                     if (self.direction <= 0 || !options.exitTarget) return;
                     if (window.icsScroll && typeof window.icsScroll.requestSoftLanding === "function") {
@@ -410,22 +347,16 @@
             }
         });
 
-        function renderSequenceVideo() {
-            sequence.render(false);
-        }
-
         timeline
             .to(sequence.state, {
                 progress: settleStart,
                 duration: settleStart,
-                ease: "none",
-                onUpdate: renderSequenceVideo
+                ease: "none"
             }, 0)
             .to(sequence.state, {
                 progress: 1,
                 duration: totalDuration - settleStart,
-                ease: "power2.out",
-                onUpdate: renderSequenceVideo
+                ease: "power2.out"
             }, settleStart);
 
         const progressBar = sequence.stage.querySelector(".sequence-progress span");
@@ -439,6 +370,24 @@
         options.chapterWindows.forEach(function (range, index) {
             if (chapters[index]) animateChapter(timeline, chapters[index], range[0], range[1], options.chapterTransition);
         });
+
+        if (options.syncImagesToChapters && sequence.images.length > 1) {
+            const imageTransitionDuration = options.imageTransitionDuration || 0.06;
+            options.chapterWindows.forEach(function (range, index) {
+                if (index === 0 || !sequence.images[index]
+                    || sequence.images[index] === sequence.images[index - 1]) return;
+                timeline.to(sequence.images[index - 1], {
+                    autoAlpha: 0,
+                    duration: imageTransitionDuration,
+                    ease: "power1.inOut"
+                }, range[0]);
+                timeline.to(sequence.images[index], {
+                    autoAlpha: 1,
+                    duration: imageTransitionDuration,
+                    ease: "power1.inOut"
+                }, range[0]);
+            });
+        }
 
         if (options.heroIntroMotion) {
             const stage = sequence.stage;
@@ -479,110 +428,64 @@
     }
 
     try {
-        const dubaiSequence = createVideoSequence({
-            videoId: "dubai-sequence-video",
+        const dubaiSequence = createStaticSequence({
             trigger: "#section_1"
         });
 
-        const propertySequence = createVideoSequence({
-            videoId: "property-sequence-video",
+        const propertySequence = createStaticSequence({
             trigger: "#property-journey"
         });
 
-        buildSequenceTimeline(dubaiSequence, {
-            trigger: "#section_1",
-            exitTarget: "#section_2",
-            chapterSelector: "[data-dubai-chapter]",
-            heroIntroMotion: true,
-            chapterWindows: [[0.20, 0.34], [0.43, 0.59], [0.69, 0.88]],
-            desktopDistance: 5200,
-            mobileDistance: 3800
-        });
-
-        buildSequenceTimeline(propertySequence, {
-            trigger: "#property-journey",
-            exitTarget: "#section_3",
-            chapterSelector: "[data-property-chapter]",
-            // Captions 03 and 04 align with the townhouse and city reveals.
-            chapterWindows: [[0.03, 0.18], [0.27, 0.43], [0.608, 0.792], [0.852, 0.94]],
-            chapterTransition: {
-                enterDuration: 0.07,
-                leaveDuration: 0.06,
-                enterEase: "power2.out",
-                leaveEase: "power2.inOut"
-            },
-            desktopDistance: 5600,
-            mobileDistance: 4000
-        });
-
-        if (propertySequence) {
-            // Backstop: if the hero never resolves, the second clip must still
-            // start loading before the visitor arrives at it.
-            ScrollTrigger.create({
-                trigger: "#property-journey",
-                start: "top 300%",
-                once: true,
-                onEnter: propertySequence.requestLoad
-            });
-        }
-
         if (dubaiSequence) {
-            reportLoaderBuffering(dubaiSequence.video);
-
-            // The two clips download in sequence rather than in parallel. Loading
-            // both at once was the reason the hero took so long to appear; making
-            // the second one wait for the visitor instead left it unbuffered on
-            // arrival, so it starts the moment the hero is playable. The hero is
-            // pinned for thousands of pixels of scroll, which is ample time.
             dubaiSequence.ready.then(function () {
-                if (propertySequence) propertySequence.requestLoad();
-            });
-
-            // The reveal is capped in time as well as gated on the video. A
-            // visitor on a slow link should meet the site and watch the hero fade
-            // in, not sit behind a loader waiting for tens of megabytes.
-            const revealDeadline = new Promise(function (resolve) {
-                window.setTimeout(resolve, 4500);
-            });
-
-            Promise.race([dubaiSequence.ready, revealDeadline]).then(function () {
+                buildSequenceTimeline(dubaiSequence, {
+                    trigger: "#section_1",
+                    exitTarget: "#section_2",
+                    chapterSelector: "[data-dubai-chapter]",
+                    heroIntroMotion: true,
+                    chapterWindows: [[0.20, 0.34], [0.43, 0.59], [0.69, 0.88]],
+                    desktopDistance: 5200,
+                    mobileDistance: 3800
+                });
                 setLoaderProgress(0.96);
-                dubaiSequence.activate();
-                if (propertySequence) propertySequence.requestLoad();
+                window.clearTimeout(loaderFailSafe);
+                finishLoader();
+            }).catch(function (error) {
+                console.error("ICS hero image initialization failed:", error);
                 window.clearTimeout(loaderFailSafe);
                 finishLoader();
             });
         } else {
-            if (propertySequence) propertySequence.requestLoad();
             window.clearTimeout(loaderFailSafe);
             finishLoader();
         }
 
-        // Lets us confirm scrub state from the console on a real device without
-        // adding logging to the hot path: window.icsSequences.status()
-        window.icsSequences = {
-            dubai: dubaiSequence,
-            property: propertySequence,
-            status: function () {
-                return [["dubai", dubaiSequence], ["property", propertySequence]].map(function (entry) {
-                    const sequence = entry[1];
-                    if (!sequence) return { name: entry[0], created: false };
-                    const video = sequence.video;
-                    return {
-                        name: entry[0],
-                        src: video.currentSrc || "(none)",
-                        readyState: video.readyState,
-                        networkState: video.networkState,
-                        duration: video.duration,
-                        currentTime: video.currentTime,
-                        progress: sequence.state.progress,
-                        classes: sequence.stage.className
-                    };
+        if (propertySequence) {
+            propertySequence.ready.then(function () {
+                buildSequenceTimeline(propertySequence, {
+                    trigger: "#property-journey",
+                    exitTarget: "#section_3",
+                    chapterSelector: "[data-property-chapter]",
+                    // Captions 03 and 04 align with the townhouse and city reveals.
+                    chapterWindows: [[0.03, 0.18], [0.27, 0.43], [0.608, 0.792], [0.852, 0.94]],
+                    chapterTransition: {
+                        enterDuration: 0.07,
+                        leaveDuration: 0.06,
+                        enterEase: "power2.out",
+                        leaveEase: "power2.inOut"
+                    },
+                    syncImagesToChapters: true,
+                    imageTransitionDuration: 0.06,
+                    desktopDistance: 5600,
+                    mobileDistance: 4000
                 });
-            }
-        };
+                ScrollTrigger.refresh();
+            }).catch(function (error) {
+                console.error("ICS property image initialization failed:", error);
+            });
+        }
     } catch (error) {
-        console.error("ICS video sequence initialization failed:", error);
+        console.error("ICS static sequence initialization failed:", error);
         window.clearTimeout(loaderFailSafe);
         finishLoader();
     }
