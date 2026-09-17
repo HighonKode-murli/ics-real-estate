@@ -2,6 +2,7 @@
   "name": "ics-real-estate-website",
   "private": true,
   "scripts": {
-    "build": "node scripts/build-pages.mjs"
+    "build": "node scripts/build-pages.mjs",
+    "optimize:videos": "node scripts/faststart-mp4.mjs \"output 1.mp4\" \"output 2.mp4\""
   }
 }

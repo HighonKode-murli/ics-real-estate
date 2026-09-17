@@ -254,66 +254,230 @@
         const stage = document.querySelector(options.trigger);
         if (!video || !stage) return null;
 
+        const usesManagedSeeking = navigator.maxTouchPoints > 0
+            && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+        const minimumSeekInterval = 1000 / 15;
+        const minimumSeekDelta = 1 / 30;
         const state = { progress: 0 };
         let isReady = false;
-        let readinessSettled = false;
+        let readyResolved = false;
+        let isPrepared = false;
+        let isUnlocked = false;
+        let unlockPromise = null;
+        let desiredTime = 0;
         let lastTargetTime = -1;
+        let lastSeekStartedAt = -Infinity;
+        let seekInFlight = false;
+        let seekQueued = false;
+        let seekTimer = 0;
+        let seekWatchdog = 0;
+        let readinessTimer = 0;
         let resolveReadiness;
 
         const ready = new Promise(function (resolve) {
             resolveReadiness = resolve;
         });
 
-        function render(force) {
-            if (!isReady || !Number.isFinite(video.duration) || video.duration <= 0) return;
-
-            const progress = Math.max(0, Math.min(1, state.progress));
-            const targetTime = progress === 1
-                ? Math.max(0, video.duration - (1 / 240))
-                : progress * video.duration;
-
-            if (!force && Math.abs(targetTime - lastTargetTime) < (1 / 240)) return;
-            lastTargetTime = targetTime;
-            video.currentTime = targetTime;
-        }
-
-        function settleReadiness(success) {
-            if (readinessSettled) return;
-            readinessSettled = true;
-            isReady = success;
-            stage.classList.add(success ? "is-video-ready" : "is-video-error");
-
-            if (success) {
-                video.pause();
-                render(true);
-            }
-
+        function resolveReady(success) {
+            if (readyResolved) return;
+            readyResolved = true;
             resolveReadiness(success);
         }
 
-        video.muted = true;
-        video.pause();
-        video.addEventListener("loadeddata", function () {
-            settleReadiness(true);
-        }, { once: true });
-        video.addEventListener("error", function () {
-            settleReadiness(false);
-        }, { once: true });
-
-        if (video.readyState >= 2 && Number.isFinite(video.duration)) {
-            settleReadiness(true);
-        } else if (video.networkState === 0) {
-            video.load();
+        function targetTimeForProgress() {
+            const progress = Math.max(0, Math.min(1, state.progress));
+            return progress === 1
+                ? Math.max(0, video.duration - (1 / 240))
+                : progress * video.duration;
         }
+
+        function issueManagedSeek(force) {
+            window.clearTimeout(seekTimer);
+            seekTimer = 0;
+            if (!isReady || !Number.isFinite(video.duration) || video.duration <= 0) return;
+
+            const delta = Math.abs(desiredTime - video.currentTime);
+            if (delta < minimumSeekDelta) {
+                seekQueued = false;
+                return;
+            }
+
+            if (seekInFlight || video.seeking) {
+                seekQueued = true;
+                return;
+            }
+
+            const wait = minimumSeekInterval - (performance.now() - lastSeekStartedAt);
+            if (!force && wait > 0) {
+                seekQueued = true;
+                seekTimer = window.setTimeout(function () {
+                    issueManagedSeek(false);
+                }, wait);
+                return;
+            }
+
+            seekQueued = false;
+            seekInFlight = true;
+            lastSeekStartedAt = performance.now();
+            window.clearTimeout(seekWatchdog);
+            seekWatchdog = window.setTimeout(function () {
+                seekInFlight = false;
+                if (isReady && Math.abs(desiredTime - video.currentTime) >= minimumSeekDelta) {
+                    issueManagedSeek(false);
+                }
+            }, 500);
+
+            try {
+                video.currentTime = desiredTime;
+            } catch (error) {
+                window.clearTimeout(seekWatchdog);
+                seekInFlight = false;
+            }
+        }
+
+        function render(force) {
+            if (!isReady || !Number.isFinite(video.duration) || video.duration <= 0) return;
+            desiredTime = targetTimeForProgress();
+
+            if (usesManagedSeeking) {
+                issueManagedSeek(Boolean(force));
+                return;
+            }
+
+            if (!force && Math.abs(desiredTime - lastTargetTime) < (1 / 240)) return;
+            lastTargetTime = desiredTime;
+            video.currentTime = desiredTime;
+        }
+
+        function markReady() {
+            if (isReady || !Number.isFinite(video.duration) || video.duration <= 0 || video.readyState < 2) return;
+            isReady = true;
+            window.clearTimeout(readinessTimer);
+            stage.classList.remove("is-video-error");
+            stage.classList.add("is-video-ready");
+            if (!unlockPromise) video.pause();
+            resolveReady(true);
+            render(true);
+        }
+
+        function markError() {
+            window.clearTimeout(seekTimer);
+            window.clearTimeout(seekWatchdog);
+            seekInFlight = false;
+            seekQueued = false;
+            if (isReady) return;
+            stage.classList.add("is-video-error");
+            resolveReady(false);
+        }
+
+        function checkReady() {
+            if (video.readyState >= 2) markReady();
+        }
+
+        function primeFirstFrame() {
+            if (!isPrepared || !Number.isFinite(video.duration) || video.duration <= 0 || video.currentTime > 0) return;
+            try {
+                video.currentTime = Math.min(0.001, video.duration / 2);
+            } catch (error) {
+                // Safari may reject this until its media pipeline is unlocked by a gesture.
+            }
+        }
+
+        function removeUnlockListeners() {
+            document.removeEventListener("touchstart", unlockFromGesture, true);
+            document.removeEventListener("pointerdown", unlockFromGesture, true);
+        }
+
+        function unlock(fromGesture) {
+            if (!usesManagedSeeking || !isPrepared || isUnlocked || (unlockPromise && !fromGesture)) return unlockPromise;
+            video.muted = true;
+            video.defaultMuted = true;
+            video.playsInline = true;
+            video.setAttribute("playsinline", "");
+            video.setAttribute("webkit-playsinline", "");
+
+            let playAttempt;
+            try {
+                playAttempt = video.play();
+            } catch (error) {
+                return null;
+            }
+
+            if (!playAttempt || typeof playAttempt.then !== "function") {
+                isUnlocked = true;
+                video.pause();
+                removeUnlockListeners();
+                checkReady();
+                return null;
+            }
+
+            unlockPromise = playAttempt.then(function () {
+                isUnlocked = true;
+                unlockPromise = null;
+                video.pause();
+                removeUnlockListeners();
+                checkReady();
+                render(true);
+            }).catch(function () {
+                unlockPromise = null;
+            });
+
+            return unlockPromise;
+        }
+
+        function unlockFromGesture() {
+            unlock(true);
+        }
+
+        function prepare() {
+            if (isPrepared) return;
+            isPrepared = true;
+            video.preload = "auto";
+            readinessTimer = window.setTimeout(markError, 8000);
+
+            if (video.readyState < 2) video.load();
+            if (usesManagedSeeking) unlock();
+            primeFirstFrame();
+            checkReady();
+        }
+
+        video.muted = true;
+        video.defaultMuted = true;
+        video.playsInline = true;
+        video.addEventListener("loadedmetadata", function () {
+            primeFirstFrame();
+            checkReady();
+        });
+        video.addEventListener("loadeddata", markReady);
+        video.addEventListener("canplay", markReady);
+        video.addEventListener("timeupdate", checkReady);
+        video.addEventListener("seeked", function () {
+            window.clearTimeout(seekWatchdog);
+            seekInFlight = false;
+            checkReady();
+            if (usesManagedSeeking && isReady
+                && (seekQueued || Math.abs(desiredTime - video.currentTime) >= minimumSeekDelta)) {
+                issueManagedSeek(false);
+            }
+        });
+        video.addEventListener("error", markError);
+
+        if (usesManagedSeeking) {
+            document.addEventListener("touchstart", unlockFromGesture, { passive: true, capture: true });
+            document.addEventListener("pointerdown", unlockFromGesture, { passive: true, capture: true });
+        }
+
+        if (!options.deferPreload) prepare();
 
         return {
             stage: stage,
             state: state,
             ready: ready,
             render: render,
+            prepare: prepare,
             activate: function () {
-                video.pause();
-                if (video.networkState === 0) video.load();
+                prepare();
+                unlock();
                 render(true);
             }
         };
@@ -433,7 +597,8 @@
 
         const propertySequence = createVideoSequence({
             videoId: "property-sequence-video",
-            trigger: "#property-journey"
+            trigger: "#property-journey",
+            deferPreload: true
         });
 
         buildSequenceTimeline(dubaiSequence, {
@@ -467,7 +632,7 @@
                 trigger: "#property-journey",
                 start: "top 180%",
                 once: true,
-                onEnter: propertySequence.activate
+                onEnter: propertySequence.prepare
             });
         }
 
