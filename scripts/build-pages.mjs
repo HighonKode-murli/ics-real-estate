@@ -11,8 +11,8 @@ const publicEntries = [
   "js",
   "fonts",
   "images",
-  "dubai_zoom_image_frames",
-  "real_estate_video_img_frames"
+  "output 1.mp4",
+  "output 2.mp4"
 ];
 
 async function assertEntryExists(entry) {

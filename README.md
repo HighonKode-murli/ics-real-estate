@@ -42,7 +42,7 @@ The build includes only:
 - `js/`
 - `fonts/`
 - `images/`
-- `dubai_zoom_image_frames/`
-- `real_estate_video_img_frames/`
+- `output 1.mp4`
+- `output 2.mp4`
 
 Custom-domain configuration is intentionally not included yet.

@@ -227,166 +227,9 @@
         });
     }
 
-    // Register ordinary page animations before optional canvas work so a sequence
-    // asset failure can never disable the rest of the site.
+    // Register ordinary page animations before scroll-video setup so a media
+    // failure can never disable the rest of the site.
     initSiteAnimations();
-
-    function framePath(folder, index) {
-        return `${folder}/image-${String(index + 1).padStart(6, "0")}.webp`;
-    }
-
-    function createImageSequence(options) {
-        const canvas = document.getElementById(options.canvasId);
-        const stage = document.querySelector(options.trigger);
-        if (!canvas || !stage) return null;
-
-        const context = canvas.getContext("2d");
-        if (!context) return null;
-
-        const images = new Array(options.frameCount);
-        const requests = new Array(options.frameCount);
-        const state = { frame: 0 };
-        let lastRenderedFrame = -1;
-        let cssWidth = 1;
-        let cssHeight = 1;
-        let preloadCursor = 0;
-        let preloadTimer = null;
-        let active = false;
-        let resizeTimer = null;
-        let lastViewportWidth = window.innerWidth;
-
-        function resize() {
-            const bounds = stage.getBoundingClientRect();
-            const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            cssWidth = Math.max(1, Math.round(bounds.width));
-            cssHeight = Math.max(1, Math.round(bounds.height));
-            canvas.width = Math.round(cssWidth * dpr);
-            canvas.height = Math.round(cssHeight * dpr);
-            context.setTransform(dpr, 0, 0, dpr, 0, 0);
-            lastRenderedFrame = -1;
-            render(true);
-        }
-
-        function drawCover(image) {
-            const scale = Math.max(cssWidth / image.naturalWidth, cssHeight / image.naturalHeight);
-            const width = image.naturalWidth * scale;
-            const height = image.naturalHeight * scale;
-            context.clearRect(0, 0, cssWidth, cssHeight);
-            context.drawImage(image, (cssWidth - width) / 2, (cssHeight - height) / 2, width, height);
-        }
-
-        function nearestLoaded(target) {
-            if (images[target]) return target;
-            for (let offset = 1; offset < options.frameCount; offset += 1) {
-                if (target - offset >= 0 && images[target - offset]) return target - offset;
-                if (target + offset < options.frameCount && images[target + offset]) return target + offset;
-            }
-            return -1;
-        }
-
-        function render(force) {
-            const target = Math.max(0, Math.min(options.frameCount - 1, Math.round(state.frame)));
-            const drawable = nearestLoaded(target);
-            if (drawable < 0 || (!force && drawable === lastRenderedFrame)) return;
-            drawCover(images[drawable]);
-            lastRenderedFrame = drawable;
-        }
-
-        function requestFrame(index) {
-            if (index < 0 || index >= options.frameCount) return Promise.resolve(false);
-            if (requests[index]) return requests[index];
-
-            requests[index] = new Promise(function (resolve) {
-                const image = new Image();
-                image.decoding = "async";
-                image.onload = function () {
-                    images[index] = image;
-                    if (index === 0) stage.classList.add("is-canvas-ready");
-                    if (Math.abs(index - Math.round(state.frame)) <= 2 || lastRenderedFrame < 0) render(true);
-                    resolve(true);
-                };
-                image.onerror = function () {
-                    requests[index] = null;
-                    resolve(false);
-                };
-                image.src = framePath(options.folder, index);
-            });
-
-            return requests[index];
-        }
-
-        function requestAround(frame) {
-            const center = Math.round(frame);
-            requestFrame(center);
-            for (let offset = 1; offset <= 16; offset += 1) {
-                requestFrame(center + offset);
-                requestFrame(center - offset);
-            }
-        }
-
-        function preloadBatch() {
-            if (!active) return;
-            let count = 0;
-            while (preloadCursor < options.frameCount && count < 8) {
-                requestFrame(preloadCursor);
-                preloadCursor += 1;
-                count += 1;
-            }
-            if (preloadCursor < options.frameCount) {
-                preloadTimer = window.setTimeout(preloadBatch, 70);
-            }
-        }
-
-        function activate() {
-            if (active) return;
-            active = true;
-            requestAround(state.frame);
-            requestFrame(options.frameCount - 1);
-            preloadBatch();
-        }
-
-        function prime(count, onProgress) {
-            const total = Math.min(count, options.frameCount);
-            let completed = 0;
-            const jobs = [];
-            for (let index = 0; index < total; index += 1) {
-                jobs.push(requestFrame(index).then(function () {
-                    completed += 1;
-                    if (onProgress) onProgress(completed / total);
-                }));
-            }
-            return Promise.all(jobs);
-        }
-
-        window.addEventListener("resize", function () {
-            const nextWidth = window.innerWidth;
-            if (Math.abs(nextWidth - lastViewportWidth) < 2) return;
-            lastViewportWidth = nextWidth;
-            syncMobileViewportHeight(false);
-            window.clearTimeout(resizeTimer);
-            resizeTimer = window.setTimeout(function () {
-                resize();
-                ScrollTrigger.refresh();
-            }, 160);
-        }, { passive: true });
-
-        resize();
-        requestFrame(0);
-
-        return {
-            stage: stage,
-            state: state,
-            frameCount: options.frameCount,
-            render: render,
-            requestAround: requestAround,
-            requestFrame: requestFrame,
-            activate: activate,
-            prime: prime,
-            destroy: function () {
-                window.clearTimeout(preloadTimer);
-            }
-        };
-    }
 
     function animateChapter(timeline, element, enter, leave, transition) {
         const chapterOffset = isMobile ? 24 : 42;
@@ -406,12 +249,81 @@
         );
     }
 
+    function createVideoSequence(options) {
+        const video = document.getElementById(options.videoId);
+        const stage = document.querySelector(options.trigger);
+        if (!video || !stage) return null;
+
+        const state = { progress: 0 };
+        let isReady = false;
+        let readinessSettled = false;
+        let lastTargetTime = -1;
+        let resolveReadiness;
+
+        const ready = new Promise(function (resolve) {
+            resolveReadiness = resolve;
+        });
+
+        function render(force) {
+            if (!isReady || !Number.isFinite(video.duration) || video.duration <= 0) return;
+
+            const progress = Math.max(0, Math.min(1, state.progress));
+            const targetTime = progress === 1
+                ? Math.max(0, video.duration - (1 / 240))
+                : progress * video.duration;
+
+            if (!force && Math.abs(targetTime - lastTargetTime) < (1 / 240)) return;
+            lastTargetTime = targetTime;
+            video.currentTime = targetTime;
+        }
+
+        function settleReadiness(success) {
+            if (readinessSettled) return;
+            readinessSettled = true;
+            isReady = success;
+            stage.classList.add(success ? "is-video-ready" : "is-video-error");
+
+            if (success) {
+                video.pause();
+                render(true);
+            }
+
+            resolveReadiness(success);
+        }
+
+        video.muted = true;
+        video.pause();
+        video.addEventListener("loadeddata", function () {
+            settleReadiness(true);
+        }, { once: true });
+        video.addEventListener("error", function () {
+            settleReadiness(false);
+        }, { once: true });
+
+        if (video.readyState >= 2 && Number.isFinite(video.duration)) {
+            settleReadiness(true);
+        } else if (video.networkState === 0) {
+            video.load();
+        }
+
+        return {
+            stage: stage,
+            state: state,
+            ready: ready,
+            render: render,
+            activate: function () {
+                video.pause();
+                if (video.networkState === 0) video.load();
+                render(true);
+            }
+        };
+    }
+
     function buildSequenceTimeline(sequence, options) {
         if (!sequence) return null;
         const chapters = gsap.utils.toArray(options.chapterSelector);
         const endGlide = typeof options.endGlide === "number" ? Math.max(0, options.endGlide) : 0.15;
         const settleStart = 0.94;
-        const settleFrame = Math.round((sequence.frameCount - 1) * settleStart);
         const totalDuration = 1 + endGlide;
         const scrollDistanceScale = totalDuration;
 
@@ -445,23 +357,22 @@
             }
         });
 
-        function renderSequenceFrame() {
-            sequence.requestAround(sequence.state.frame);
+        function renderSequenceVideo() {
             sequence.render(false);
         }
 
         timeline
             .to(sequence.state, {
-                frame: settleFrame,
+                progress: settleStart,
                 duration: settleStart,
                 ease: "none",
-                onUpdate: renderSequenceFrame
+                onUpdate: renderSequenceVideo
             }, 0)
             .to(sequence.state, {
-                frame: sequence.frameCount - 1,
+                progress: 1,
                 duration: totalDuration - settleStart,
                 ease: "power2.out",
-                onUpdate: renderSequenceFrame
+                onUpdate: renderSequenceVideo
             }, settleStart);
 
         const progressBar = sequence.stage.querySelector(".sequence-progress span");
@@ -509,50 +420,37 @@
                     duration: 0.08,
                     ease: "power2.in"
                 }, 0.025);
-        } else if (options.introSelector) {
-            timeline.to(options.introSelector, {
-                y: -36,
-                duration: 0.06,
-                stagger: 0.008,
-                ease: "power2.in"
-            }, 0.1);
         }
 
         return timeline;
     }
 
     try {
-        const dubaiSequence = createImageSequence({
-            canvasId: "dubai-sequence-canvas",
-            trigger: "#section_1",
-            folder: "dubai_zoom_image_frames",
-            frameCount: 596
+        const dubaiSequence = createVideoSequence({
+            videoId: "dubai-sequence-video",
+            trigger: "#section_1"
         });
 
-        const propertySequence = createImageSequence({
-            canvasId: "property-sequence-canvas",
-            trigger: "#property-journey",
-            folder: "real_estate_video_img_frames",
-            frameCount: 596
+        const propertySequence = createVideoSequence({
+            videoId: "property-sequence-video",
+            trigger: "#property-journey"
         });
 
         buildSequenceTimeline(dubaiSequence, {
             trigger: "#section_1",
             exitTarget: "#section_2",
             chapterSelector: "[data-dubai-chapter]",
-            introSelector: ".hero-intro-layer",
             heroIntroMotion: true,
             chapterWindows: [[0.20, 0.34], [0.43, 0.59], [0.69, 0.88]],
             desktopDistance: 5200,
-            mobileDistance: 3800,
-            posterFrame: 300
+            mobileDistance: 3800
         });
 
         buildSequenceTimeline(propertySequence, {
             trigger: "#property-journey",
             exitTarget: "#section_3",
             chapterSelector: "[data-property-chapter]",
-            // Caption 03 follows the townhouse reveal (~image 363); caption 04 follows the city reveal (~image 508).
+            // Captions 03 and 04 align with the townhouse and city reveals.
             chapterWindows: [[0.03, 0.18], [0.27, 0.43], [0.608, 0.792], [0.852, 0.94]],
             chapterTransition: {
                 enterDuration: 0.07,
@@ -561,8 +459,7 @@
                 leaveEase: "power2.inOut"
             },
             desktopDistance: 5600,
-            mobileDistance: 4000,
-            posterFrame: 200
+            mobileDistance: 4000
         });
 
         if (propertySequence) {
@@ -575,11 +472,8 @@
         }
 
         if (dubaiSequence) {
-            const primePromise = dubaiSequence.prime(90, function (progress) {
-                setLoaderProgress(progress * 0.96);
-            });
-
-            primePromise.then(function () {
+            dubaiSequence.ready.then(function () {
+                setLoaderProgress(0.96);
                 dubaiSequence.activate();
                 window.clearTimeout(loaderFailSafe);
                 finishLoader();
@@ -589,7 +483,7 @@
             finishLoader();
         }
     } catch (error) {
-        console.error("ICS image sequence initialization failed:", error);
+        console.error("ICS video sequence initialization failed:", error);
         window.clearTimeout(loaderFailSafe);
         finishLoader();
     }
