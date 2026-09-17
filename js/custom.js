@@ -8,6 +8,7 @@
     const preferredDate = document.getElementById("bb-date");
     const menuLinks = panel ? Array.from(panel.querySelectorAll(".menu-link")) : [];
     let menuOpen = false;
+    let pendingMenuTarget = null;
 
     if (preferredDate) {
         preferredDate.min = new Date().toISOString().split("T")[0];
@@ -38,6 +39,10 @@
         menuOpen = open;
         if (open) setHeaderHidden(false);
         document.body.classList.toggle("menu-is-open", open);
+        if (window.icsScroll) {
+            if (open) window.icsScroll.lock("menu");
+            else window.icsScroll.unlock("menu");
+        }
         if (main) {
             if (open) main.setAttribute("inert", "");
             else main.removeAttribute("inert");
@@ -64,7 +69,19 @@
             onReverseComplete: function () {
                 panel.style.visibility = "hidden";
                 setMenuState(false);
-                toggle.focus({ preventScroll: true });
+
+                if (pendingMenuTarget && window.icsScroll) {
+                    const target = pendingMenuTarget;
+                    pendingMenuTarget = null;
+                    window.icsScroll.scrollTo(target, {
+                        updateHash: true,
+                        focus: true,
+                        focusAtStart: true
+                    });
+                } else {
+                    pendingMenuTarget = null;
+                    toggle.focus({ preventScroll: true });
+                }
             }
         });
 
@@ -99,6 +116,7 @@
 
         toggle.addEventListener("click", function () {
             if (menuOpen) {
+                pendingMenuTarget = null;
                 menuTimeline.reverse();
             } else {
                 setMenuState(true);
@@ -111,16 +129,15 @@
                 const target = document.querySelector(link.getAttribute("href"));
                 if (!target) return;
                 event.preventDefault();
+                pendingMenuTarget = target;
                 menuTimeline.reverse();
-                window.setTimeout(function () {
-                    target.scrollIntoView({ behavior: "smooth", block: "start" });
-                }, 280);
             });
         });
 
         document.addEventListener("keydown", function (event) {
             if (!menuOpen) return;
             if (event.key === "Escape") {
+                pendingMenuTarget = null;
                 menuTimeline.reverse();
                 return;
             }
@@ -142,6 +159,22 @@
             setMenuState(!menuOpen);
             panel.style.visibility = menuOpen ? "visible" : "hidden";
         });
+        menuLinks.forEach(function (link) {
+            link.addEventListener("click", function (event) {
+                const target = document.querySelector(link.getAttribute("href"));
+                setMenuState(false);
+                panel.style.visibility = "hidden";
+
+                if (target && window.icsScroll) {
+                    event.preventDefault();
+                    window.icsScroll.scrollTo(target, {
+                        updateHash: true,
+                        focus: true,
+                        focusAtStart: true
+                    });
+                }
+            });
+        });
     }
 
     if (header) {
@@ -150,16 +183,6 @@
 
     document.querySelectorAll('.social-icon-link[href="#"]').forEach(function (link) {
         link.addEventListener("click", function (event) { event.preventDefault(); });
-    });
-
-    document.querySelectorAll("a.smoothscroll, .site-brand").forEach(function (link) {
-        link.addEventListener("click", function (event) {
-            const selector = link.getAttribute("href");
-            const target = selector && selector.startsWith("#") ? document.querySelector(selector) : null;
-            if (!target) return;
-            event.preventDefault();
-            target.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
     });
 
     if (window.ScrollTrigger) {

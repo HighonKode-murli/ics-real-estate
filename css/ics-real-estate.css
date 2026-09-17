@@ -1856,6 +1856,7 @@ body.menu-is-open {
   grid-template-rows: auto 1fr auto;
   padding: 24px var(--page-gutter) 28px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   visibility: hidden;
   color: var(--ink);
   background: var(--ivory);

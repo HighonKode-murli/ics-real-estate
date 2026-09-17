@@ -18,6 +18,10 @@
         if (loaderFinished) return;
         loaderFinished = true;
         document.body.classList.remove("is-loading");
+        if (window.icsScroll) {
+            window.icsScroll.unlock("loader");
+            window.icsScroll.refresh();
+        }
         if (loader) loader.classList.add("is-complete");
 
         window.setTimeout(function () {
