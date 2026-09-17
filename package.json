@@ -2,6 +2,11 @@
   "name": "ics-real-estate-website",
   "private": true,
   "scripts": {
-    "build": "node scripts/build-pages.mjs"
+    "build": "node scripts/build-pages.mjs",
+    "serve": "node scripts/serve.mjs",
+    "serve:dist": "node scripts/serve.mjs --root dist",
+    "media:probe": "node scripts/probe-mp4.mjs \"output 1.mp4\" \"output 2.mp4\" \"output 1-mobile.mp4\" \"output 2-mobile.mp4\"",
+    "media:check": "node scripts/faststart-mp4.mjs --check \"output 1.mp4\" \"output 2.mp4\" \"output 1-mobile.mp4\" \"output 2-mobile.mp4\"",
+    "media:faststart": "node scripts/faststart-mp4.mjs \"output 1.mp4\" \"output 2.mp4\" \"output 1-mobile.mp4\" \"output 2-mobile.mp4\""
   }
 }

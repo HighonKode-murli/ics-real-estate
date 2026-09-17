@@ -14,6 +14,26 @@
         if (loaderProgress) loaderProgress.style.transform = `scaleX(${progress})`;
     }
 
+    // Without this the bar holds at zero for the whole hero download and the site
+    // reads as hung. Buffered ranges give a truthful figure for almost no cost.
+    function reportLoaderBuffering(video) {
+        if (!video) return;
+
+        function update() {
+            if (loaderFinished || !video.buffered || video.buffered.length === 0) return;
+            const duration = video.duration;
+            if (!Number.isFinite(duration) || duration <= 0) return;
+
+            const buffered = video.buffered.end(video.buffered.length - 1);
+            setLoaderProgress(0.08 + 0.85 * Math.min(1, buffered / duration));
+        }
+
+        video.addEventListener("progress", update);
+        video.addEventListener("loadedmetadata", function () {
+            setLoaderProgress(0.08);
+        }, { once: true });
+    }
+
     function revealSite() {
         if (loaderFinished) return;
         loaderFinished = true;
@@ -54,7 +74,7 @@
     }
 
     // The loader must never trap the visitor, even when an asset or CDN is unavailable.
-    const loaderFailSafe = window.setTimeout(finishLoader, 12000);
+    const loaderFailSafe = window.setTimeout(finishLoader, 8000);
 
     if (typeof window.gsap === "undefined" || typeof window.ScrollTrigger === "undefined") {
         console.error("ICS animations: GSAP or ScrollTrigger did not load.");
@@ -256,14 +276,19 @@
 
         const state = { progress: 0 };
         let isReady = false;
-        let readinessSettled = false;
         let lastTargetTime = -1;
+        let loadStarted = video.preload !== "none";
+        let readinessWatchdog = 0;
         let resolveReadiness;
 
         const ready = new Promise(function (resolve) {
             resolveReadiness = resolve;
         });
 
+        // Direct currentTime assignment on every scrub update. Attempts to
+        // throttle this against video.seeking deadlock the scrub, so the seek
+        // load is kept down by shipping a smaller rendition instead (see the
+        // <source> list in index.html) rather than by dropping updates here.
         function render(force) {
             if (!isReady || !Number.isFinite(video.duration) || video.duration <= 0) return;
 
@@ -277,33 +302,59 @@
             video.currentTime = targetTime;
         }
 
-        function settleReadiness(success) {
-            if (readinessSettled) return;
-            readinessSettled = true;
-            isReady = success;
-            stage.classList.add(success ? "is-video-ready" : "is-video-error");
+        function requestLoad() {
+            if (loadStarted) return;
+            loadStarted = true;
+            if (video.preload === "none") video.preload = "auto";
+            video.load();
+            startReadinessWatchdog();
+        }
 
-            if (success) {
-                video.pause();
-                render(true);
-            }
+        function markReady() {
+            if (isReady) return;
+            isReady = true;
+            window.clearTimeout(readinessWatchdog);
+            stage.classList.remove("is-video-error");
+            stage.classList.add("is-video-ready");
+            video.pause();
+            render(true);
+            resolveReadiness(true);
+        }
 
-            resolveReadiness(success);
+        function markUnavailable() {
+            if (isReady) return;
+            // Show the stage backdrop instead of leaving a spinner running
+            // forever. This is not final: a slow video that arrives later still
+            // calls markReady and takes over.
+            stage.classList.add("is-video-error");
+            resolveReadiness(false);
+        }
+
+        function startReadinessWatchdog() {
+            window.clearTimeout(readinessWatchdog);
+            readinessWatchdog = window.setTimeout(markUnavailable, 15000);
         }
 
         video.muted = true;
+        video.defaultMuted = true;
         video.pause();
-        video.addEventListener("loadeddata", function () {
-            settleReadiness(true);
-        }, { once: true });
+
+        // Not { once: true }: if the watchdog gave up first, a late success must
+        // still be able to promote the stage to ready.
+        video.addEventListener("loadeddata", markReady);
+        // With <source> children the failure event is dispatched at the child,
+        // not at the video, so this listener has to capture. A single source
+        // failing is normal (the browser tries the next one); only an exhausted
+        // candidate list, NETWORK_NO_SOURCE, is terminal.
         video.addEventListener("error", function () {
-            settleReadiness(false);
-        }, { once: true });
+            if (video.networkState === 3) markUnavailable();
+        }, true);
 
         if (video.readyState >= 2 && Number.isFinite(video.duration)) {
-            settleReadiness(true);
-        } else if (video.networkState === 0) {
-            video.load();
+            markReady();
+        } else if (loadStarted) {
+            if (video.networkState === 0) video.load();
+            startReadinessWatchdog();
         }
 
         return {
@@ -311,9 +362,11 @@
             state: state,
             ready: ready,
             render: render,
+            video: video,
+            requestLoad: requestLoad,
             activate: function () {
+                requestLoad();
                 video.pause();
-                if (video.networkState === 0) video.load();
                 render(true);
             }
         };
@@ -463,25 +516,71 @@
         });
 
         if (propertySequence) {
+            // Backstop: if the hero never resolves, the second clip must still
+            // start loading before the visitor arrives at it.
             ScrollTrigger.create({
                 trigger: "#property-journey",
-                start: "top 180%",
+                start: "top 300%",
                 once: true,
-                onEnter: propertySequence.activate
+                onEnter: propertySequence.requestLoad
             });
         }
 
         if (dubaiSequence) {
+            reportLoaderBuffering(dubaiSequence.video);
+
+            // The two clips download in sequence rather than in parallel. Loading
+            // both at once was the reason the hero took so long to appear; making
+            // the second one wait for the visitor instead left it unbuffered on
+            // arrival, so it starts the moment the hero is playable. The hero is
+            // pinned for thousands of pixels of scroll, which is ample time.
             dubaiSequence.ready.then(function () {
+                if (propertySequence) propertySequence.requestLoad();
+            });
+
+            // The reveal is capped in time as well as gated on the video. A
+            // visitor on a slow link should meet the site and watch the hero fade
+            // in, not sit behind a loader waiting for tens of megabytes.
+            const revealDeadline = new Promise(function (resolve) {
+                window.setTimeout(resolve, 4500);
+            });
+
+            Promise.race([dubaiSequence.ready, revealDeadline]).then(function () {
                 setLoaderProgress(0.96);
                 dubaiSequence.activate();
+                if (propertySequence) propertySequence.requestLoad();
                 window.clearTimeout(loaderFailSafe);
                 finishLoader();
             });
         } else {
+            if (propertySequence) propertySequence.requestLoad();
             window.clearTimeout(loaderFailSafe);
             finishLoader();
         }
+
+        // Lets us confirm scrub state from the console on a real device without
+        // adding logging to the hot path: window.icsSequences.status()
+        window.icsSequences = {
+            dubai: dubaiSequence,
+            property: propertySequence,
+            status: function () {
+                return [["dubai", dubaiSequence], ["property", propertySequence]].map(function (entry) {
+                    const sequence = entry[1];
+                    if (!sequence) return { name: entry[0], created: false };
+                    const video = sequence.video;
+                    return {
+                        name: entry[0],
+                        src: video.currentSrc || "(none)",
+                        readyState: video.readyState,
+                        networkState: video.networkState,
+                        duration: video.duration,
+                        currentTime: video.currentTime,
+                        progress: sequence.state.progress,
+                        classes: sequence.stage.className
+                    };
+                });
+            }
+        };
     } catch (error) {
         console.error("ICS video sequence initialization failed:", error);
         window.clearTimeout(loaderFailSafe);

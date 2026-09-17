@@ -70,7 +70,14 @@
     <main class="site-main">
                 <div id="hero-div">
                     <section class="hero-section sequence-stage" id="section_1" aria-label="Dubai, seen through ICS">
-                        <video class="sequence-video" id="dubai-sequence-video" src="output%201.mp4" muted playsinline preload="auto" disablepictureinpicture aria-hidden="true"></video>
+                        <!-- The hero is the only media allowed to download on first paint.
+                             Source order matters: the browser picks the first matching
+                             <source>, so the 960x540 rendition is offered to phones and
+                             tablets before the 1080p master is ever considered. -->
+                        <video class="sequence-video" id="dubai-sequence-video" muted playsinline preload="auto" disablepictureinpicture aria-hidden="true">
+                            <source src="output%201-mobile.mp4" type="video/mp4" media="(max-width: 991px), (pointer: coarse) and (max-width: 1366px)">
+                            <source src="output%201.mp4" type="video/mp4">
+                        </video>
                         <div class="sequence-shade" aria-hidden="true"></div>
                         <div class="sequence-loader" aria-hidden="true">
                             <span class="sequence-loader__line"></span>
@@ -192,7 +199,13 @@
                 </section>
 
                 <section class="property-journey sequence-stage" id="property-journey" aria-label="A journey through Dubai property">
-                    <video class="sequence-video" id="property-sequence-video" src="output%202.mp4" muted playsinline preload="auto" disablepictureinpicture aria-hidden="true"></video>
+                    <!-- preload="none" keeps this clip off the wire until the visitor is
+                         actually heading towards it. Loading it alongside the hero was
+                         doubling the bytes competing for bandwidth during first paint. -->
+                    <video class="sequence-video" id="property-sequence-video" muted playsinline preload="none" disablepictureinpicture aria-hidden="true">
+                        <source src="output%202-mobile.mp4" type="video/mp4" media="(max-width: 991px), (pointer: coarse) and (max-width: 1366px)">
+                        <source src="output%202.mp4" type="video/mp4">
+                    </video>
                     <div class="sequence-shade sequence-shade--property" aria-hidden="true"></div>
                     <div class="sequence-loader" aria-hidden="true">
                         <span class="sequence-loader__line"></span>
