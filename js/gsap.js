@@ -435,7 +435,13 @@
                 invalidateOnRefresh: true,
                 refreshPriority: options.trigger === "#section_1" ? 20 : 10,
                 onEnter: sequence.activate,
-                onEnterBack: sequence.activate
+                onEnterBack: sequence.activate,
+                onLeave: function (self) {
+                    if (self.direction <= 0 || !options.exitTarget) return;
+                    if (window.icsScroll && typeof window.icsScroll.requestSoftLanding === "function") {
+                        window.icsScroll.requestSoftLanding(options.exitTarget);
+                    }
+                }
             }
         });
 
@@ -459,7 +465,12 @@
             }, settleStart);
 
         const progressBar = sequence.stage.querySelector(".sequence-progress span");
-        if (progressBar) timeline.to(progressBar, { scaleX: 1, duration: totalDuration, ease: "none" }, 0);
+        if (progressBar) {
+            const progressAxis = progressBar.parentElement.dataset.progressAxis === "y" ? "scaleY" : "scaleX";
+            const progressAnimation = { duration: totalDuration, ease: "none" };
+            progressAnimation[progressAxis] = 1;
+            timeline.to(progressBar, progressAnimation, 0);
+        }
 
         options.chapterWindows.forEach(function (range, index) {
             if (chapters[index]) animateChapter(timeline, chapters[index], range[0], range[1], options.chapterTransition);
@@ -527,6 +538,7 @@
 
         buildSequenceTimeline(dubaiSequence, {
             trigger: "#section_1",
+            exitTarget: "#section_2",
             chapterSelector: "[data-dubai-chapter]",
             introSelector: ".hero-intro-layer",
             heroIntroMotion: true,
@@ -538,6 +550,7 @@
 
         buildSequenceTimeline(propertySequence, {
             trigger: "#property-journey",
+            exitTarget: "#section_3",
             chapterSelector: "[data-property-chapter]",
             // Caption 03 follows the townhouse reveal (~image 363); caption 04 follows the city reveal (~image 508).
             chapterWindows: [[0.03, 0.18], [0.27, 0.43], [0.608, 0.792], [0.852, 0.94]],

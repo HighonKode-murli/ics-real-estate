@@ -27,6 +27,18 @@
         })
         : null;
 
+    const softLandingConfig = {
+        wheelSessionMs: 2000,
+        holdDownwardInputMs: 900,
+        cooldownMs: 1200
+    };
+    let lastWheelAt = -Infinity;
+    let lastWheelDeltaY = 0;
+    let softLanding = null;
+    let softLandingCooldownUntil = 0;
+    let programmaticScrollUntil = 0;
+    let navigationToken = 0;
+
     function prefersReducedMotion() {
         return reducedMotionQuery.matches || Boolean(lenis && lenis.prefersReducedMotion);
     }
@@ -74,6 +86,14 @@
 
         if (mode === "replace") window.history.replaceState(null, "", hash);
         else window.history.pushState(null, "", hash);
+    }
+
+    function clearSoftLanding(startCooldown) {
+        if (softLanding) window.clearTimeout(softLanding.timeoutId);
+        softLanding = null;
+        if (startCooldown) {
+            softLandingCooldownUntil = performance.now() + softLandingConfig.cooldownMs;
+        }
     }
 
     function nativeScroll(target, options, onComplete) {
@@ -139,15 +159,26 @@
         }
 
         pendingScroll = null;
+        const isSoftLanding = request.source === "soft-landing";
         const scrollTarget = target instanceof Element && target.id === "section_1" ? 0 : target;
         const options = {
             offset: typeof request.offset === "number" ? request.offset : headerOffset(target),
             immediate: Boolean(request.immediate) || prefersReducedMotion()
         };
+        let requestNavigationToken = navigationToken;
+
+        if (!isSoftLanding) {
+            clearSoftLanding(true);
+            requestNavigationToken = ++navigationToken;
+            programmaticScrollUntil = performance.now() + (options.immediate ? 300 : 4000);
+        }
 
         if (request.focusAtStart) focusTarget(target);
 
         const complete = function () {
+            if (!isSoftLanding && requestNavigationToken === navigationToken) {
+                programmaticScrollUntil = 0;
+            }
             if (request.focus !== false && !request.focusAtStart) focusTarget(target);
             if (typeof request.onComplete === "function") request.onComplete();
         };
@@ -158,13 +189,58 @@
             lenis.scrollTo(scrollTarget, {
                 offset: options.offset,
                 immediate: options.immediate,
-                lerp: options.immediate ? 1 : 0.075,
+                lerp: options.immediate
+                    ? 1
+                    : (typeof request.lerp === "number" ? request.lerp : 0.075),
                 force: Boolean(request.force),
                 onComplete: complete
             });
         } else {
             nativeScroll(scrollTarget, options, complete);
         }
+
+        return true;
+    }
+
+    function requestSoftLanding(target) {
+        const now = performance.now();
+        if (!lenis || prefersReducedMotion() || lockReasons.size || softLanding) return false;
+        if (now < softLandingCooldownUntil || now < programmaticScrollUntil) return false;
+        if (now - lastWheelAt > softLandingConfig.wheelSessionMs || lastWheelDeltaY <= 0) return false;
+
+        const landingTarget = resolveTarget(target);
+        if (!(landingTarget instanceof Element)) return false;
+
+        const landing = {
+            startedAt: now,
+            target: landingTarget,
+            timeoutId: 0
+        };
+        softLanding = landing;
+        lastWheelAt = -Infinity;
+
+        const started = performScroll({
+            target: landingTarget,
+            updateHash: false,
+            focus: false,
+            focusAtStart: false,
+            force: false,
+            immediate: false,
+            lerp: 0.18,
+            source: "soft-landing",
+            onComplete: function () {
+                if (softLanding === landing) clearSoftLanding(true);
+            }
+        });
+
+        if (!started) {
+            clearSoftLanding(true);
+            return false;
+        }
+
+        landing.timeoutId = window.setTimeout(function () {
+            if (softLanding === landing) clearSoftLanding(true);
+        }, 2400);
 
         return true;
     }
@@ -211,10 +287,13 @@
                 focus: false,
                 focusAtStart: false,
                 force: false,
-                immediate: false
+                immediate: false,
+                source: "navigation"
             }, options || {}));
         },
+        requestSoftLanding: requestSoftLanding,
         lock: function (reason) {
+            clearSoftLanding(true);
             lockReasons.add(reason || "anonymous");
             applyLockState();
         },
@@ -232,6 +311,24 @@
     window.icsScroll = scrollController;
 
     if (lenis) {
+        lenis.on("virtual-scroll", function (input) {
+            const event = input && input.event;
+            const deltaY = input && Number.isFinite(input.deltaY) ? input.deltaY : 0;
+            if (!event || event.type !== "wheel") return;
+
+            const now = performance.now();
+            if (softLanding && deltaY > 0
+                && now - softLanding.startedAt < softLandingConfig.holdDownwardInputMs) {
+                event.lenisStopPropagation = true;
+                if (typeof event.preventDefault === "function") event.preventDefault();
+                return;
+            }
+
+            if (softLanding) clearSoftLanding(true);
+            lastWheelAt = now;
+            lastWheelDeltaY = deltaY;
+        });
+
         lenis.on("scroll", function () {
             if (window.ScrollTrigger) window.ScrollTrigger.update();
         });

@@ -1083,6 +1083,29 @@ body.is-loading {
   transform-origin: left center;
 }
 
+.sequence-progress.sequence-progress--vertical {
+  right: 50px;
+  bottom: 98px;
+  left: auto;
+  width: 2px;
+  height: clamp(68px, 10vh, 96px);
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.sequence-progress--vertical span {
+  transform: scaleY(0);
+  transform-origin: center top;
+}
+
+@media screen and (max-width: 767px) {
+  .sequence-progress.sequence-progress--vertical {
+    right: 25px;
+    bottom: max(28px, env(safe-area-inset-bottom));
+    left: auto;
+    height: 72px;
+  }
+}
+
 @media screen and (max-width: 767px) {
   .sequence-stage {
     min-height: 100svh;
