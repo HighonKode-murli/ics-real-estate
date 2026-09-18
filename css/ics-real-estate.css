@@ -1583,7 +1583,7 @@ body.is-loading {
   .hero-content {
     right: 25px;
     bottom: 30px;
-    left: 25px;
+    left: calc(25px + 8px);
   }
 
   .hero-content h1 {
@@ -1655,6 +1655,10 @@ body.is-loading {
   .about-team-section {
     margin-top: 15px;
     padding-top: 15px;
+  }
+
+  .hero-categories {
+    left: 25px;
   }
 
   .hero-intro {
@@ -1996,6 +2000,12 @@ body.menu-is-open {
   font-weight: 600;
   line-height: 0.76;
   letter-spacing: -0.075em;
+}
+
+@media screen and (min-width: 768px) {
+  .hero-content h1 {
+    margin-left: 0.35em;
+  }
 }
 
 #hero-h1-2 {
@@ -2711,7 +2721,9 @@ body.menu-is-open {
   }
 
   .hero-content {
+    right: 25px;
     bottom: 28px;
+    left: calc(var(--page-gutter) + 12px);
   }
 
   .hero-content h1 {
@@ -3175,6 +3187,7 @@ body.menu-is-open {
 
   .hero-content {
     bottom: max(22px, env(safe-area-inset-bottom));
+    left: calc(var(--page-gutter) + 22px);
   }
 
   .hero-content h1 {
@@ -3449,6 +3462,7 @@ body.menu-is-open {
 
   .hero-content {
     bottom: 16px;
+    left: calc(var(--page-gutter) + 12px);
   }
 
   .hero-content h1 {
