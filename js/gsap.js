@@ -591,14 +591,16 @@
             // Otherwise add to the main timeline
             if (disablePinOnMobile) {
                 // Create standalone scroll-based animations for mobile (no pin)
+                // Use longer end point and proper scrubbing for smooth bidirectional animation
                 gsap.to(stage.querySelectorAll(".hero-categories span"), {
                     y: isMobile ? -180 : -300,
                     ease: "none",
                     scrollTrigger: {
                         trigger: "#section_1",
                         start: "top top",
-                        end: "bottom top",
-                        scrub: 2
+                        end: "bottom 80%",
+                        scrub: 1.5,
+                        toggleActions: "play none none reverse"
                     }
                 });
                 
@@ -608,34 +610,37 @@
                     scrollTrigger: {
                         trigger: "#section_1",
                         start: "top top",
-                        end: "bottom top",
-                        scrub: 2
+                        end: "bottom 80%",
+                        scrub: 1.5,
+                        toggleActions: "play none none reverse"
                     }
                 });
                 
                 gsap.to(stage.querySelector("#hero-h1-1"), {
                     x: function () {
-                        return isMobile ? -window.innerWidth * 2 : -Math.max(800, window.innerWidth * 0.85);
+                        return isMobile ? -window.innerWidth * 1.5 : -Math.max(800, window.innerWidth * 0.85);
                     },
                     ease: "none",
                     scrollTrigger: {
                         trigger: "#section_1",
                         start: "top top",
-                        end: "bottom top",
-                        scrub: 2
+                        end: "bottom 80%",
+                        scrub: 1.5,
+                        toggleActions: "play none none reverse"
                     }
                 });
                 
                 gsap.to(stage.querySelector("#hero-h1-2"), {
                     x: function () {
-                        return isMobile ? window.innerWidth * 2 : Math.max(800, window.innerWidth * 0.85);
+                        return isMobile ? window.innerWidth * 1.5 : Math.max(800, window.innerWidth * 0.85);
                     },
                     ease: "none",
                     scrollTrigger: {
                         trigger: "#section_1",
                         start: "top top",
-                        end: "bottom top",
-                        scrub: 2
+                        end: "bottom 80%",
+                        scrub: 1.5,
+                        toggleActions: "play none none reverse"
                     }
                 });
                 
@@ -646,8 +651,9 @@
                     scrollTrigger: {
                         trigger: "#section_1",
                         start: "top top",
-                        end: "bottom top",
-                        scrub: 2
+                        end: "bottom 90%",
+                        scrub: 1.5,
+                        toggleActions: "play none none reverse"
                     }
                 });
             } else {
