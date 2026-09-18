@@ -489,16 +489,7 @@
         const scrollDistanceScale = totalDuration;
 
         gsap.set(chapters, { autoAlpha: 0 });
-        
-        // Determine if pinning should be disabled (mobile only for hero section)
-        const isMobileDevice = window.innerWidth <= 991;
-        const disablePinOnMobile = options.disablePinOnMobile && isMobileDevice;
-        
-        // Debug logging
-        if (options.trigger === "#section_1") {
-            console.log("Hero section - Width:", window.innerWidth, "isMobile:", isMobileDevice, "disablePinOnMobile:", disablePinOnMobile);
-        }
-        
+
         const scrollTriggerConfig = {
             trigger: options.trigger,
             start: "top top",
@@ -511,6 +502,8 @@
                 const mobilePlaybackDistance = Math.min(options.mobileDistance, responsiveDistance);
                 return `+=${Math.round(mobilePlaybackDistance * scrollDistanceScale)}`;
             },
+            pin: true,
+            pinSpacing: true,
             scrub: 2,
             anticipatePin: 1,
             invalidateOnRefresh: true,
@@ -522,19 +515,7 @@
                 }
             }
         };
-        
-        // Only add pin properties if not disabled on mobile
-        if (!disablePinOnMobile) {
-            scrollTriggerConfig.pin = true;
-            scrollTriggerConfig.pinSpacing = true;
-            if (options.trigger === "#section_1") {
-                console.log("Hero section - PIN ENABLED");
-            }
-        } else {
-            if (options.trigger === "#section_1") {
-                console.log("Hero section - PIN DISABLED");
-            }
-        }
+
         
         const timeline = gsap.timeline({
             scrollTrigger: scrollTriggerConfig
@@ -587,74 +568,9 @@
         if (options.heroIntroMotion) {
             const stage = sequence.stage;
             
-            // If pinning is disabled on mobile, create independent scroll triggers
-            // Otherwise add to the main timeline
-            if (disablePinOnMobile) {
-                // Create standalone scroll-based animations for mobile (no pin)
-                gsap.to(stage.querySelectorAll(".hero-categories span"), {
-                    y: isMobile ? -180 : -300,
-                    ease: "none",
-                    scrollTrigger: {
-                        trigger: "#section_1",
-                        start: "top top",
-                        end: "bottom top",
-                        scrub: 2
-                    }
-                });
-                
-                gsap.to(stage.querySelector(".hero-intro p"), {
-                    y: isMobile ? -180 : -300,
-                    ease: "none",
-                    scrollTrigger: {
-                        trigger: "#section_1",
-                        start: "top top",
-                        end: "bottom top",
-                        scrub: 2
-                    }
-                });
-                
-                gsap.to(stage.querySelector("#hero-h1-1"), {
-                    x: function () {
-                        return isMobile ? -window.innerWidth * 2 : -Math.max(800, window.innerWidth * 0.85);
-                    },
-                    ease: "none",
-                    scrollTrigger: {
-                        trigger: "#section_1",
-                        start: "top top",
-                        end: "bottom top",
-                        scrub: 2
-                    }
-                });
-                
-                gsap.to(stage.querySelector("#hero-h1-2"), {
-                    x: function () {
-                        return isMobile ? window.innerWidth * 2 : Math.max(800, window.innerWidth * 0.85);
-                    },
-                    ease: "none",
-                    scrollTrigger: {
-                        trigger: "#section_1",
-                        start: "top top",
-                        end: "bottom top",
-                        scrub: 2
-                    }
-                });
-                
-                gsap.to(stage.querySelector(".sequence-scroll-cue"), {
-                    autoAlpha: 0,
-                    y: -45,
-                    ease: "none",
-                    scrollTrigger: {
-                        trigger: "#section_1",
-                        start: "top top",
-                        end: "bottom top",
-                        scrub: 2
-                    }
-                });
-            } else {
-                // Original timeline-based animations for desktop (with pin)
                 timeline
                     .to(stage.querySelectorAll(".hero-categories span"), {
-                        y: isMobile ? -180 : -300,
+                        y: -300,
                         duration: 2,
                         ease: "power2.in",
                         scrollTrigger:{
@@ -664,7 +580,7 @@
                         }
                     }, 0.025)
                     .to(stage.querySelector(".hero-intro p"), {
-                        y: isMobile ? -180 : -300,
+                        y: -300,
                         duration: 2,
                         ease: "power2.in",
                         scrollTrigger:{
@@ -675,7 +591,7 @@
                     }, 0.025)
                     .to(stage.querySelector("#hero-h1-1"), {
                         x: function () {
-                            return isMobile ? -window.innerWidth * 2 : -Math.max(800, window.innerWidth * 0.85);
+                            return -Math.max(800, window.innerWidth * 0.85);
                         },
                         duration: 2,
                         ease: "power2.in",
@@ -687,7 +603,7 @@
                     }, 0.035)
                     .to(stage.querySelector("#hero-h1-2"), {
                         x: function () {
-                            return isMobile ? window.innerWidth * 2 : Math.max(800, window.innerWidth * 0.85);
+                            return Math.max(800, window.innerWidth * 0.85);
                         },
                         duration: 2,
                         ease: "power2.in",
@@ -708,13 +624,78 @@
                             start : "top 100%",
                         }
                     }, 0.025);
-            }
+
         }
 
         return timeline;
     }
 
+    /* ---------------------------------------------------------------
+       Mobile hero helper — lightweight, non-scrub approach.
+       Replaces the heavy pinned-scrub timeline on touch devices to
+       eliminate jitter and the "stuck text on scroll-back" bug.
+       Desktop behaviour is completely untouched.
+       --------------------------------------------------------------- */
+    function initMobileHero(sequence) {
+        var stage = sequence.stage;
+        if (!stage) return;
+
+        /* The hero-intro-layer elements were already revealed by revealSite().
+           We just need a simple, reliable show/hide on scroll.              */
+
+        var heroLayers  = stage.querySelectorAll(".hero-categories, .hero-intro, .hero-content, .sequence-scroll-cue");
+        var progressBar = stage.querySelector(".sequence-progress--vertical span");
+
+        /* Use a single non-scrub ScrollTrigger that toggles a GSAP tween.
+           toggleActions: "play none none reverse" guarantees the reverse
+           always fires when scrolling back, which fixes the stuck-text bug. */
+        gsap.to(heroLayers, {
+            autoAlpha: 0,
+            y: -60,
+            duration: 0.5,
+            ease: "power2.in",
+            stagger: 0.03,
+            scrollTrigger: {
+                trigger: "#section_1",
+                start: "top -15%",       /* content starts fading once 15% of hero has scrolled off */
+                end: "top -45%",
+                scrub: false,             /* NO scrub — instant, reliable toggle */
+                toggleActions: "play none none reverse"
+            }
+        });
+
+        /* Fade the scroll-cue earlier so it gets out of the way quickly */
+        gsap.to(stage.querySelector(".sequence-scroll-cue"), {
+            autoAlpha: 0,
+            y: -20,
+            duration: 0.35,
+            ease: "power2.in",
+            scrollTrigger: {
+                trigger: "#section_1",
+                start: "top -5%",
+                toggleActions: "play none none reverse"
+            }
+        });
+
+        /* Fade the vertical progress bar if present */
+        if (progressBar) {
+            gsap.to(progressBar, {
+                scaleY: 1,
+                duration: 0.6,
+                ease: "none",
+                scrollTrigger: {
+                    trigger: "#section_1",
+                    start: "top top",
+                    end: "bottom top",
+                    scrub: true           /* progress bar scrub is fine — it's a thin line, no layout cost */
+                }
+            });
+        }
+    }
+
     try {
+        const isMobileHero = window.innerWidth <= 991;
+
         const dubaiSequence = createStaticSequence({
             trigger: "#section_1"
         });
@@ -728,17 +709,21 @@
 
         if (dubaiSequence) {
             dubaiSequence.ready.then(function () {
-                buildSequenceTimeline(dubaiSequence, {
-                    trigger: "#section_1",
-                    exitTarget: "#section_2",
-                    chapterSelector: "[data-dubai-chapter]",
-                    heroIntroMotion: true,
-                    chapterWindows: [[0.20, 0.34], [0.43, 0.59], [0.69, 0.88]],
-                    desktopDistance: 5200,
-                    mobileDistance: 3800,
-                    disablePinOnMobile: true  // Disable pin on mobile for hero section
-                    
-                });
+                if (isMobileHero) {
+                    /* MOBILE — lightweight, jitter-free hero */
+                    initMobileHero(dubaiSequence);
+                } else {
+                    /* DESKTOP — original pinned scrub timeline, untouched */
+                    buildSequenceTimeline(dubaiSequence, {
+                        trigger: "#section_1",
+                        exitTarget: "#section_2",
+                        chapterSelector: "[data-dubai-chapter]",
+                        heroIntroMotion: true,
+                        chapterWindows: [[0.20, 0.34], [0.43, 0.59], [0.69, 0.88]],
+                        desktopDistance: 5200,
+                        mobileDistance: 3800
+                    });
+                }
                 setLoaderProgress(0.96);
                 window.clearTimeout(loaderFailSafe);
                 finishLoader();

@@ -3915,3 +3915,32 @@ body.menu-is-open {
   }
 }
 
+
+/* ============================================================
+   MOBILE HERO — performance & reliability
+   Promotes hero overlay elements to GPU-composited layers so
+   GSAP toggleActions animate without triggering layout/paint.
+   Only applies on mobile to avoid unnecessary compositor cost
+   on desktop where the pinned-scrub approach already works.
+   ============================================================ */
+@media screen and (max-width: 991px) {
+  .hero-categories,
+  .hero-intro,
+  .hero-content,
+  .sequence-scroll-cue {
+    will-change: transform, opacity;
+    transform: translate3d(0, 0, 0);     /* force compositor layer */
+    backface-visibility: hidden;
+  }
+
+  /* The hero section should NOT be pinned on mobile, so ensure
+     no pin-spacer artefacts or overflow clipping occur */
+  #hero-div {
+    overflow: visible;
+  }
+
+  .hero-section,
+  #section_1 {
+    overflow: hidden;
+  }
+}
