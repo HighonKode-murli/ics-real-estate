@@ -92,7 +92,21 @@
                 duration: 0.32,
                 ease: "power2.in"
             }, 0)
-            .to(panel, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.75 }, 0)
+            .fromTo(panel, 
+                { 
+                    clipPath: "inset(0 0 100% 0)",
+                    y: "-100%",
+                    autoAlpha: 0
+                },
+                { 
+                    clipPath: "inset(0% 0% 0% 0%)", 
+                    y: "0%",
+                    autoAlpha: 1,
+                    duration: 0.6,
+                    ease: "power3.out"
+                }, 
+                0
+            )
             .fromTo(".menu-panel__meta span",
                 { y: 18, autoAlpha: 0 },
                 { y: 0, autoAlpha: 1, duration: 0.45, stagger: 0.04, ease: "power3.out" },

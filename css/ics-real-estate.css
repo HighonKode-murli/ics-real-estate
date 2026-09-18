@@ -1874,6 +1874,8 @@ body.menu-is-open {
   color: var(--ink);
   background: var(--ivory);
   clip-path: inset(0 0 100% 0);
+  transform: translateY(-100%);
+  opacity: 0;
 }
 
 .menu-panel__meta,
@@ -3541,6 +3543,8 @@ body.menu-is-open {
 .menu-is-open .menu-panel {
   visibility: visible;
   clip-path: inset(0);
+  transform: translateY(0);
+  opacity: 1;
 }
 
 #section_1,
