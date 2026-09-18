@@ -136,7 +136,7 @@
                 trigger: "#services-title",
                 start: "top 82%",
                 end: "top 42%",
-                scrub: 1
+                scrub: 2
             }
         });
 
@@ -147,7 +147,7 @@
                 trigger: "#services-title",
                 start: "top 62%",
                 end: "top 35%",
-                scrub: 1
+                scrub: 2
             }
         });
 
@@ -163,7 +163,7 @@
                     trigger: card,
                     start: "top 92%",
                     end: "top 48%",
-                    scrub: 1
+                    scrub: 2
                 }
             });
             if (image && !isMobile) {
@@ -175,7 +175,7 @@
                         trigger: card,
                         start: "top bottom",
                         end: "bottom top",
-                        scrub: true
+                        scrub: 2
                     }
                 });
             }
@@ -189,7 +189,7 @@
                 trigger: "#booking-div",
                 start: "top 78%",
                 end: "top 32%",
-                scrub: 1
+                scrub: 2
             }
         });
 
@@ -200,7 +200,7 @@
                 trigger: ".booking-form-body",
                 start: "top 90%",
                 end: "top 58%",
-                scrub: 1
+                scrub: 2
             }
         });
 
@@ -211,7 +211,7 @@
                 trigger: ".contact-statement",
                 start: "top 90%",
                 end: "top 48%",
-                scrub: 1
+                scrub: 2
             }
         });
 
@@ -222,7 +222,7 @@
                 trigger: ".contact-details",
                 start: "top 92%",
                 end: "top 65%",
-                scrub: 1
+                scrub: 2
             }
         });
     }
@@ -489,32 +489,55 @@
         const scrollDistanceScale = totalDuration;
 
         gsap.set(chapters, { autoAlpha: 0 });
-        const timeline = gsap.timeline({
-            scrollTrigger: {
-                trigger: options.trigger,
-                start: "top top",
-                end: function () {
-                    if (!hasChapters) return `+=${Math.round(Math.max(1, window.innerHeight * 0.85))}`;
-                    if (window.innerWidth >= 992) {
-                        return `+=${Math.round(options.desktopDistance * scrollDistanceScale)}`;
-                    }
-                    const responsiveDistance = Math.round(Math.max(2400, window.innerHeight * 3.6));
-                    const mobilePlaybackDistance = Math.min(options.mobileDistance, responsiveDistance);
-                    return `+=${Math.round(mobilePlaybackDistance * scrollDistanceScale)}`;
-                },
-                scrub: 0.6,
-                pin: true,
-                pinSpacing: true,
-                anticipatePin: 1,
-                invalidateOnRefresh: true,
-                refreshPriority: options.trigger === "#section_1" ? 20 : 10,
-                onLeave: function (self) {
-                    if (self.direction <= 0 || !options.exitTarget) return;
-                    if (window.icsScroll && typeof window.icsScroll.requestSoftLanding === "function") {
-                        window.icsScroll.requestSoftLanding(options.exitTarget);
-                    }
+        
+        // Determine if pinning should be disabled (mobile only for hero section)
+        const isMobileDevice = window.innerWidth <= 991;
+        const disablePinOnMobile = options.disablePinOnMobile && isMobileDevice;
+        
+        // Debug logging
+        if (options.trigger === "#section_1") {
+            console.log("Hero section - Width:", window.innerWidth, "isMobile:", isMobileDevice, "disablePinOnMobile:", disablePinOnMobile);
+        }
+        
+        const scrollTriggerConfig = {
+            trigger: options.trigger,
+            start: "top top",
+            end: function () {
+                if (!hasChapters) return `+=${Math.round(Math.max(1, window.innerHeight * 0.85))}`;
+                if (window.innerWidth >= 992) {
+                    return `+=${Math.round(options.desktopDistance * scrollDistanceScale)}`;
+                }
+                const responsiveDistance = Math.round(Math.max(2400, window.innerHeight * 3.6));
+                const mobilePlaybackDistance = Math.min(options.mobileDistance, responsiveDistance);
+                return `+=${Math.round(mobilePlaybackDistance * scrollDistanceScale)}`;
+            },
+            scrub: 2,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
+            refreshPriority: options.trigger === "#section_1" ? 20 : 10,
+            onLeave: function (self) {
+                if (self.direction <= 0 || !options.exitTarget) return;
+                if (window.icsScroll && typeof window.icsScroll.requestSoftLanding === "function") {
+                    window.icsScroll.requestSoftLanding(options.exitTarget);
                 }
             }
+        };
+        
+        // Only add pin properties if not disabled on mobile
+        if (!disablePinOnMobile) {
+            scrollTriggerConfig.pin = true;
+            scrollTriggerConfig.pinSpacing = true;
+            if (options.trigger === "#section_1") {
+                console.log("Hero section - PIN ENABLED");
+            }
+        } else {
+            if (options.trigger === "#section_1") {
+                console.log("Hero section - PIN DISABLED");
+            }
+        }
+        
+        const timeline = gsap.timeline({
+            scrollTrigger: scrollTriggerConfig
         });
 
         if (hasChapters) {
@@ -563,62 +586,129 @@
 
         if (options.heroIntroMotion) {
             const stage = sequence.stage;
-            timeline
-                .to(stage.querySelectorAll(".hero-categories span"), {
+            
+            // If pinning is disabled on mobile, create independent scroll triggers
+            // Otherwise add to the main timeline
+            if (disablePinOnMobile) {
+                // Create standalone scroll-based animations for mobile (no pin)
+                gsap.to(stage.querySelectorAll(".hero-categories span"), {
                     y: isMobile ? -180 : -300,
-                    duration: 2,
-                    ease: "power2.in",
-                    scrollTrigger:{
-                        trigger : "#hero-div",
-                        scrub : 2,
-                        start : "top 100%"
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: "#section_1",
+                        start: "top top",
+                        end: "bottom top",
+                        scrub: 2
                     }
-                }, 0.025)
-                .to(stage.querySelector(".hero-intro p"), {
+                });
+                
+                gsap.to(stage.querySelector(".hero-intro p"), {
                     y: isMobile ? -180 : -300,
-                    duration: 2,
-                    ease: "power2.in",
-                    scrollTrigger:{
-                        trigger : "#hero-div",
-                        scrub : 2,
-                        start : "top 100%"
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: "#section_1",
+                        start: "top top",
+                        end: "bottom top",
+                        scrub: 2
                     }
-                }, 0.025)
-                .to(stage.querySelector("#hero-h1-1"), {
+                });
+                
+                gsap.to(stage.querySelector("#hero-h1-1"), {
                     x: function () {
                         return isMobile ? -window.innerWidth * 2 : -Math.max(800, window.innerWidth * 0.85);
                     },
-                    duration: 2,
-                    ease: "power2.in",
-                    scrollTrigger:{
-                        trigger : "#hero-div",
-                        scrub : 2,
-                        start : "top 100%"
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: "#section_1",
+                        start: "top top",
+                        end: "bottom top",
+                        scrub: 2
                     }
-                }, 0.035)
-                .to(stage.querySelector("#hero-h1-2"), {
+                });
+                
+                gsap.to(stage.querySelector("#hero-h1-2"), {
                     x: function () {
                         return isMobile ? window.innerWidth * 2 : Math.max(800, window.innerWidth * 0.85);
                     },
-                    duration: 2,
-                    ease: "power2.in",
-                    scrollTrigger:{
-                        trigger : "#hero-div",
-                        scrub : 2,
-                        start : "top 100%"
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: "#section_1",
+                        start: "top top",
+                        end: "bottom top",
+                        scrub: 2
                     }
-                }, 0.035)
-                .to(stage.querySelector(".sequence-scroll-cue"), {
+                });
+                
+                gsap.to(stage.querySelector(".sequence-scroll-cue"), {
                     autoAlpha: 0,
                     y: -45,
-                    duration: 2,
-                    ease: "power2.in",
-                    scrollTrigger:{
-                        trigger : "#hero-div",
-                        scrub : 2,
-                        start : "top 100%",
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: "#section_1",
+                        start: "top top",
+                        end: "bottom top",
+                        scrub: 2
                     }
-                }, 0.025);
+                });
+            } else {
+                // Original timeline-based animations for desktop (with pin)
+                timeline
+                    .to(stage.querySelectorAll(".hero-categories span"), {
+                        y: isMobile ? -180 : -300,
+                        duration: 2,
+                        ease: "power2.in",
+                        scrollTrigger:{
+                            trigger : "#hero-div",
+                            scrub : 2,
+                            start : "top 100%"
+                        }
+                    }, 0.025)
+                    .to(stage.querySelector(".hero-intro p"), {
+                        y: isMobile ? -180 : -300,
+                        duration: 2,
+                        ease: "power2.in",
+                        scrollTrigger:{
+                            trigger : "#hero-div",
+                            scrub : 2,
+                            start : "top 100%"
+                        }
+                    }, 0.025)
+                    .to(stage.querySelector("#hero-h1-1"), {
+                        x: function () {
+                            return isMobile ? -window.innerWidth * 2 : -Math.max(800, window.innerWidth * 0.85);
+                        },
+                        duration: 2,
+                        ease: "power2.in",
+                        scrollTrigger:{
+                            trigger : "#hero-div",
+                            scrub : 2,
+                            start : "top 100%"
+                        }
+                    }, 0.035)
+                    .to(stage.querySelector("#hero-h1-2"), {
+                        x: function () {
+                            return isMobile ? window.innerWidth * 2 : Math.max(800, window.innerWidth * 0.85);
+                        },
+                        duration: 2,
+                        ease: "power2.in",
+                        scrollTrigger:{
+                            trigger : "#hero-div",
+                            scrub : 2,
+                            start : "top 100%"
+                        }
+                    }, 0.035)
+                    .to(stage.querySelector(".sequence-scroll-cue"), {
+                        autoAlpha: 0,
+                        y: -45,
+                        duration: 2,
+                        ease: "power2.in",
+                        scrollTrigger:{
+                            trigger : "#hero-div",
+                            scrub : 2,
+                            start : "top 100%",
+                        }
+                    }, 0.025);
+            }
         }
 
         return timeline;
@@ -646,6 +736,7 @@
                     chapterWindows: [[0.20, 0.34], [0.43, 0.59], [0.69, 0.88]],
                     desktopDistance: 5200,
                     mobileDistance: 3800,
+                    disablePinOnMobile: true  // Disable pin on mobile for hero section
                     
                 });
                 setLoaderProgress(0.96);
