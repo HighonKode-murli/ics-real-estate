@@ -86,12 +86,6 @@
         });
 
         menuTimeline
-            .to(".site-brand", {
-                autoAlpha: 0,
-                y: -14,
-                duration: 0.32,
-                ease: "power2.in"
-            }, 0)
             .fromTo(panel, 
                 { 
                     clipPath: "inset(0 0 100% 0)",
@@ -198,6 +192,31 @@
     document.querySelectorAll('.social-icon-link[href="#"]').forEach(function (link) {
         link.addEventListener("click", function (event) { event.preventDefault(); });
     });
+
+    const developerViewport = document.querySelector(".developer-strip__viewport");
+    const developerTrack = document.querySelector(".developer-strip__track");
+
+    if (developerViewport && developerTrack) {
+        developerViewport.addEventListener("mouseenter", function () {
+            developerTrack.style.animationPlayState = "paused";
+        });
+
+        developerViewport.addEventListener("mouseleave", function () {
+            delete developerTrack.dataset.manualScroll;
+            developerTrack.style.transform = "";
+            developerTrack.style.animation = "";
+            developerTrack.style.animationPlayState = "running";
+        });
+
+        developerViewport.addEventListener("focusin", function () {
+            developerTrack.style.animationPlayState = "paused";
+        });
+
+        developerViewport.addEventListener("focusout", function () {
+            developerTrack.style.animationPlayState = "running";
+        });
+
+    }
 
     if (window.ScrollTrigger) {
         ScrollTrigger.create({

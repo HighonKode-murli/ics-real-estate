@@ -576,7 +576,7 @@
                         scrollTrigger:{
                             trigger : "#hero-div",
                             scrub : 2,
-                            start : "top 100%"
+                            start : "top top"
                         }
                     }, 0.025)
                     .to(stage.querySelector(".hero-intro p"), {
@@ -586,7 +586,7 @@
                         scrollTrigger:{
                             trigger : "#hero-div",
                             scrub : 2,
-                            start : "top 100%"
+                            start : "top top"
                         }
                     }, 0.025)
                     .to(stage.querySelector("#hero-h1-1"), {
@@ -598,7 +598,7 @@
                         scrollTrigger:{
                             trigger : "#hero-div",
                             scrub : 2,
-                            start : "top 100%"
+                            start : "top top"
                         }
                     }, 0.035)
                     .to(stage.querySelector("#hero-h1-2"), {
@@ -610,7 +610,7 @@
                         scrollTrigger:{
                             trigger : "#hero-div",
                             scrub : 2,
-                            start : "top 100%"
+                            start : "top top"
                         }
                     }, 0.035)
                     .to(stage.querySelector(".sequence-scroll-cue"), {
@@ -621,7 +621,7 @@
                         scrollTrigger:{
                             trigger : "#hero-div",
                             scrub : 2,
-                            start : "top 100%",
+                            start : "top top",
                         }
                     }, 0.025);
 
@@ -651,10 +651,10 @@
            always fires when scrolling back, which fixes the stuck-text bug. */
         gsap.to(heroLayers, {
             autoAlpha: 0,
-            y: -60,
-            duration: 0.5,
-            ease: "power2.in",
-            stagger: 0.03,
+            y: -30,
+            duration: 0.75,
+            ease: "power1.inOut",
+            stagger: 0.05,
             scrollTrigger: {
                 trigger: "#section_1",
                 start: "top -15%",       /* content starts fading once 15% of hero has scrolled off */
@@ -667,9 +667,9 @@
         /* Fade the scroll-cue earlier so it gets out of the way quickly */
         gsap.to(stage.querySelector(".sequence-scroll-cue"), {
             autoAlpha: 0,
-            y: -20,
-            duration: 0.35,
-            ease: "power2.in",
+            y: -12,
+            duration: 0.55,
+            ease: "power1.inOut",
             scrollTrigger: {
                 trigger: "#section_1",
                 start: "top -5%",
