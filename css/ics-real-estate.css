@@ -4079,6 +4079,20 @@ body.menu-is-open {
   width: 100%;
 }
 
+#bb-booking-form .booking-form-status {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+}
+
+#bb-booking-form .booking-form-status.is-error {
+  color: #a33a2b;
+}
+
+#bb-booking-form .booking-form-status.is-success {
+  color: #356b4b;
+}
+
 /* Preserve the first sequence's desktop left/right caption composition on mobile. */
 @media screen and (max-width: 767px) {
   #section_1 [data-dubai-chapter].sequence-chapter--right {

@@ -6,12 +6,44 @@
     const panel = document.getElementById("menu-panel");
     const main = document.querySelector(".site-main");
     const preferredDate = document.getElementById("bb-date");
+    const bookingForm = document.getElementById("bb-booking-form");
+    const bookingFormStatus = document.getElementById("bb-form-status");
     const menuLinks = panel ? Array.from(panel.querySelectorAll(".menu-link")) : [];
     let menuOpen = false;
     let pendingMenuTarget = null;
 
     if (preferredDate) {
         preferredDate.min = new Date().toISOString().split("T")[0];
+    }
+
+    if (bookingForm && bookingFormStatus) {
+        bookingForm.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const submitButton = bookingForm.querySelector("button[type='submit']");
+            if (submitButton) submitButton.disabled = true;
+            bookingFormStatus.textContent = "Sending your enquiry...";
+            bookingFormStatus.className = "booking-form-status is-sending";
+
+            try {
+                const response = await fetch(bookingForm.action, {
+                    method: "POST",
+                    body: new FormData(bookingForm),
+                    headers: { Accept: "application/json" }
+                });
+
+                if (!response.ok) throw new Error("The enquiry could not be sent.");
+
+                bookingForm.reset();
+                bookingFormStatus.textContent = "Thank you. Your enquiry has been sent.";
+                bookingFormStatus.className = "booking-form-status is-success";
+            } catch (error) {
+                bookingFormStatus.textContent = "Something went wrong. Please try again or email info@icsrealestate.ae.";
+                bookingFormStatus.className = "booking-form-status is-error";
+            } finally {
+                if (submitButton) submitButton.disabled = false;
+            }
+        });
     }
     let headerHidden = false;
     let lastHeaderScroll = window.scrollY;

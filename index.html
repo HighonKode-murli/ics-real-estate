@@ -319,7 +319,7 @@
                         <div class="row">
 
                             <div class="col-lg-10 col-12 mx-auto">
-                                <form action="#" method="post" class="custom-form booking-form" id="bb-booking-form"
+                                <form action="/api/enquiry" method="post" class="custom-form booking-form" id="bb-booking-form"
                                     role="form">
                                     <div class="booking-heading mb-5">
                                         <!-- <span class="booking-heading__kicker">Start a conversation</span> -->
@@ -348,9 +348,9 @@
                                             </div>
 
                                             <div class="col-lg-6 col-12">
-                                                <label class="form-label" for="bb-property-type">Property type</label>
+                                                <label class="form-label" for="bb-property-type">Property type <span>(Optional)</span></label>
                                                 <select class="form-select form-control" name="bb-property-type"
-                                                    id="bb-property-type" required>
+                                                    id="bb-property-type">
                                                     <option value="" selected disabled>Select property type</option>
                                                     <option value="Villa">Villa</option>
                                                     <option value="Penthouse">Penthouse</option>
@@ -361,8 +361,8 @@
                                             </div>
 
                                             <div class="col-lg-6 col-12">
-                                                <label class="form-label" for="bb-area">Preferred area</label>
-                                                <select class="form-select form-control" name="bb-area" id="bb-area" required>
+                                                <label class="form-label" for="bb-area">Preferred area <span>(Optional)</span></label>
+                                                <select class="form-select form-control" name="bb-area" id="bb-area">
                                                     <option value="" selected disabled>Select preferred area</option>
                                                     <option value="Downtown Dubai">Downtown Dubai</option>
                                                     <option value="Dubai Marina">Dubai Marina</option>
@@ -375,8 +375,8 @@
                                             </div>
 
                                             <div class="col-lg-6 col-12">
-                                                <label class="form-label" for="bb-date">Preferred date</label>
-                                                <input type="date" name="bb-date" id="bb-date" class="form-control" required>
+                                                <label class="form-label" for="bb-date">Preferred date <span>(Optional)</span></label>
+                                                <input type="date" name="bb-date" id="bb-date" class="form-control">
                                             </div>
                                         </div>
 
@@ -386,6 +386,7 @@
 
                                         <div class="booking-submit col-12">
                                             <button type="submit" class="form-control">Submit request</button>
+                                            <p class="booking-form-status" id="bb-form-status" role="status" aria-live="polite"></p>
                                         </div>
                                     </div>
                                 </form>

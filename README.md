@@ -33,6 +33,20 @@ Do not commit `dist/`; Cloudflare Pages generates it during deployment.
 
 Cloudflare will publish the site at `https://<project-name>.pages.dev` and rebuild it when changes are pushed to the production branch.
 
+### Enquiry email setup
+
+The enquiry form submits in place to the Cloudflare Pages Function at `/api/enquiry`; it does not redirect or use CAPTCHA. The function sends mail through Resend.
+
+1. Create a Resend API key and verify the sending domain for `icsrealestate.ae`.
+2. In Cloudflare Pages, open **Settings > Environment variables** and add these production variables:
+
+| Variable | Value |
+| --- | --- |
+| `RESEND_API_KEY` | Your Resend API key |
+| `RESEND_FROM_EMAIL` | A verified sender, for example `ICS Real Estate <noreply@icsrealestate.ae>` |
+
+The function delivers enquiries to `icsrealestatellcuae@gmail.com` and sends them from the verified `info@icsrealestate.ae` address. Keep the API key in Cloudflare and do not add it to frontend files.
+
 ## Public build contents
 
 The build includes only:
