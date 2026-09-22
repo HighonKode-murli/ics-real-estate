@@ -39,7 +39,7 @@ export async function onRequestPost({ request, env }) {
         },
         body: JSON.stringify({
             from: env.RESEND_FROM_EMAIL,
-            to: ["icsrealestatellcuae@gmail.com"],
+            to: ["info@icsrealestate.ae"],
             reply_to: fields["Email address"],
             subject: "New enquiry from ICS Real Estate website",
             html: `<h2>New website enquiry</h2><table cellpadding="8" cellspacing="0" border="1">${rows}</table>`
