@@ -1158,7 +1158,7 @@ body.is-loading {
   FEATURED               
 -----------------------------------------*/
 .featured-section {
-  background-image: url('../images/featured-dubai-night.jpg');
+  background-image: url('/images/featured-dubai-night.jpg');
   background-repeat: no-repeat;
   background-attachment: fixed;
   background-size: cover;
@@ -1263,7 +1263,7 @@ body.is-loading {
   BOOKING / SCHEDULE VIEWING              
 -----------------------------------------*/
 .booking-section {
-  background-image: url('../images/luxury-interior.jpg');
+  background-image: url('/images/luxury-interior.jpg');
   background-repeat: no-repeat;
   background-attachment: fixed;
   background-size: cover;

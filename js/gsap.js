@@ -338,7 +338,7 @@
 
         function frameSource(index) {
             const filename = `image-${String(index + 1).padStart(6, "0")}.webp`;
-            return `${options.folder}/${filename}`;
+            return `/${options.folder}/${filename}`;
         }
 
         function targetFrame() {
